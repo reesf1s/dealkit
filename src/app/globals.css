@@ -12649,6 +12649,112 @@ body:has(.crm-shell) {
   flex: 1 1 auto;
 }
 
+.crm-inline-analysis {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid rgba(36, 95, 70, .16);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255,255,252,.96), rgba(246,249,244,.9)),
+    rgba(255,255,255,.72);
+  box-shadow: 0 1px 0 rgba(255,255,255,.8), 0 14px 34px rgba(23,25,22,.07);
+}
+
+.crm-inline-analysis.loading {
+  border-style: dashed;
+}
+
+.crm-inline-analysis header,
+.crm-inline-analysis-actions,
+.crm-inline-analysis-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.crm-inline-analysis header span {
+  display: block;
+  color: rgba(23,25,22,.52);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.crm-inline-analysis h3 {
+  margin: 2px 0 0;
+  color: var(--crm-ink, #171916);
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.crm-inline-analysis > p,
+.crm-inline-analysis section p {
+  margin: 0;
+  white-space: pre-wrap;
+  color: rgba(23,25,22,.78);
+  font-size: 13px;
+  line-height: 1.62;
+}
+
+.crm-inline-analysis-sections {
+  display: grid;
+  gap: 9px;
+}
+
+.crm-inline-analysis-sections section {
+  padding: 11px;
+  border: 1px solid rgba(32,36,30,.08);
+  border-radius: 10px;
+  background: rgba(255,255,252,.72);
+}
+
+.crm-inline-analysis-sections h4 {
+  margin: 0 0 5px;
+  color: #245f46;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.crm-inline-analysis-links {
+  justify-content: flex-start;
+}
+
+.crm-inline-analysis-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(36,95,70,.16);
+  border-radius: 999px;
+  background: rgba(36,95,70,.08);
+  color: #245f46;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.crm-inline-analysis-actions {
+  justify-content: flex-start;
+}
+
+.crm-analyst-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(151, 55, 55, .18);
+  border-radius: 10px;
+  background: rgba(151, 55, 55, .08);
+  color: #8a3434;
+  font-size: 13px;
+  font-weight: 760;
+}
+
 .crm-task-board {
   display: grid;
   grid-template-columns: repeat(4, minmax(220px, 1fr));

@@ -48,6 +48,15 @@ type DealInsight = {
   risk: 'low' | 'medium' | 'high'
 }
 
+type InlineAnalysis = {
+  id: string
+  label: string
+  prompt: string
+  answer: string
+  links: Array<{ label: string; href: string }>
+  createdAt: Date
+}
+
 const tabs: Array<{ id: DealTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'activity', label: 'Activity' },
@@ -621,6 +630,35 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
   const insights = buildInsights(context)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
+  const [analysis, setAnalysis] = useState<InlineAnalysis | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState<string | null>(null)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+
+  async function runAnalysis(label: string, prompt: string) {
+    setAnalysisLoading(label)
+    setAnalysisError(null)
+    try {
+      const response = await fetch('/api/crm/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt, dealId: deal.id }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error ?? 'Halvex could not analyse this deal yet.')
+      setAnalysis({
+        id: `${Date.now()}`,
+        label,
+        prompt,
+        answer: payload?.data?.answer || 'Halvex did not return a useful answer.',
+        links: payload?.data?.links ?? [],
+        createdAt: new Date(),
+      })
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : 'Halvex could not analyse this deal yet.')
+    } finally {
+      setAnalysisLoading(null)
+    }
+  }
 
   async function createTask(insight: DealInsight) {
     setBusyId(insight.id)
@@ -664,6 +702,48 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
     }
   }
 
+  async function saveAnalysisAsNote() {
+    if (!analysis) return
+    setBusyId(`analysis-note-${analysis.id}`)
+    try {
+      await fetch(`/api/crm/deals/${deal.id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'note',
+          note: [
+            `Halvex ${analysis.label}`,
+            analysis.answer,
+            analysis.links.length ? `Linked records: ${analysis.links.map(link => `${link.label} (${link.href})`).join(', ')}` : null,
+          ].filter(Boolean).join('\n\n'),
+        }),
+      })
+      await onChanged()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function createTaskFromAnalysis() {
+    if (!analysis) return
+    const suggested = extractSuggestedAction(analysis.answer) || `Review ${deal.title} and update the next step`
+    setBusyId(`analysis-task-${analysis.id}`)
+    try {
+      await fetch('/api/crm/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: suggested,
+          priority: health.risk === 'high' ? 'high' : 'normal',
+          dealId: deal.id,
+        }),
+      })
+      await onChanged()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
     <CrmPanel className="crm-analyst-panel">
       <div className="crm-analyst-head">
@@ -682,14 +762,26 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
       </div>
 
       <div className="crm-analyst-actions">
-        <CrmButton tone="primary" onClick={() => askHalvex(`Analyse ${deal.title}. Include what changed, what is risky, what is missing, evidence, confidence, and recommended manual CRM updates.`, deal.id)}><Bot size={16} /> Analyse deal</CrmButton>
-        <CrmButton onClick={() => askHalvex(`Suggest the next step for ${deal.title}. Explain why and what evidence supports it.`, deal.id)}><CheckCircle2 size={16} /> Suggest next step</CrmButton>
-        <CrmButton onClick={() => askHalvex(`Summarise the record for ${deal.title}: fields, notes, tasks, people, risks, and current next step.`, deal.id)}><FileText size={16} /> Summarise record</CrmButton>
-        <CrmButton onClick={() => askHalvex(`Extract CRM updates from the latest note on ${deal.title}. Suggest field changes, tasks, and notes without applying them.`, deal.id)}><NotebookPen size={16} /> Extract updates</CrmButton>
-        <CrmButton onClick={() => askHalvex(`Draft a concise follow-up for ${deal.title} based only on saved CRM context.`, deal.id)}><MailPlus size={16} /> Draft follow-up</CrmButton>
-        <CrmButton onClick={() => askHalvex(`Find missing buyer information for ${deal.title}: economic buyer, champion, decision process, urgency, and blockers.`, deal.id)}><UserRound size={16} /> Missing buyer info</CrmButton>
-        <CrmButton onClick={() => askHalvex(`Explain the risk score for ${deal.title} using evidence and confidence.`, deal.id)}><RefreshCw size={16} /> Explain risk</CrmButton>
+        <CrmButton tone="primary" onClick={() => runAnalysis('Deal analysis', `Analyse ${deal.title}. Include what changed, what is risky, what is missing, evidence, confidence, and recommended manual CRM updates.`)} disabled={Boolean(analysisLoading)}><Bot size={16} /> {analysisLoading === 'Deal analysis' ? 'Analysing...' : 'Analyse deal'}</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Next step', `Suggest the next step for ${deal.title}. Explain why and what evidence supports it.`)} disabled={Boolean(analysisLoading)}><CheckCircle2 size={16} /> Suggest next step</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Record summary', `Summarise the record for ${deal.title}: fields, notes, tasks, people, risks, and current next step.`)} disabled={Boolean(analysisLoading)}><FileText size={16} /> Summarise record</CrmButton>
+        <CrmButton onClick={() => runAnalysis('CRM extraction', `Extract CRM updates from the latest note on ${deal.title}. Suggest field changes, tasks, and notes without applying them.`)} disabled={Boolean(analysisLoading)}><NotebookPen size={16} /> Extract updates</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Follow-up draft', `Draft a concise follow-up for ${deal.title} based only on saved CRM context.`)} disabled={Boolean(analysisLoading)}><MailPlus size={16} /> Draft follow-up</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Buyer gaps', `Find missing buyer information for ${deal.title}: economic buyer, champion, decision process, urgency, and blockers.`)} disabled={Boolean(analysisLoading)}><UserRound size={16} /> Missing buyer info</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Risk explanation', `Explain the risk score for ${deal.title} using evidence and confidence.`)} disabled={Boolean(analysisLoading)}><RefreshCw size={16} /> Explain risk</CrmButton>
       </div>
+
+      {analysisError ? <div className="crm-analyst-error">{analysisError}</div> : null}
+      {analysisLoading && !analysis ? <InlineAnalysisSkeleton label={analysisLoading} /> : null}
+      {analysis ? (
+        <InlineAnalysisResult
+          analysis={analysis}
+          busy={busyId}
+          onSaveNote={saveAnalysisAsNote}
+          onCreateTask={createTaskFromAnalysis}
+          onOpenDrawer={() => askHalvex(analysis.prompt, deal.id)}
+        />
+      ) : null}
 
       <div className="crm-analyst-insights">
         {insights.length ? insights.filter(insight => !dismissed.has(insight.id)).map(insight => (
@@ -723,6 +815,54 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
         {insights.length > 0 && insights.every(insight => dismissed.has(insight.id)) ? <CrmEmpty title="All recommendations dismissed">Run analysis again when the record changes.</CrmEmpty> : null}
       </div>
     </CrmPanel>
+  )
+}
+
+function InlineAnalysisSkeleton({ label }: { label: string }) {
+  return (
+    <article className="crm-inline-analysis loading">
+      <header>
+        <div>
+          <span>Running</span>
+          <h3>{label}</h3>
+        </div>
+      </header>
+      <p>Reading saved deal fields, linked people, tasks, notes, and activity before returning an evidence-based answer.</p>
+    </article>
+  )
+}
+
+function InlineAnalysisResult({ analysis, busy, onSaveNote, onCreateTask, onOpenDrawer }: { analysis: InlineAnalysis; busy: string | null; onSaveNote: () => void; onCreateTask: () => void; onOpenDrawer: () => void }) {
+  const sections = parseInlineAnalysisSections(analysis.answer)
+  return (
+    <article className="crm-inline-analysis">
+      <header>
+        <div>
+          <span>Latest result · {shortDate(analysis.createdAt) ?? 'now'}</span>
+          <h3>{analysis.label}</h3>
+        </div>
+        <CrmButton onClick={onOpenDrawer}>Open in drawer</CrmButton>
+      </header>
+      {sections.length ? (
+        <div className="crm-inline-analysis-sections">
+          {sections.map(section => (
+            <section key={section.label}>
+              <h4>{section.label}</h4>
+              <p>{section.body}</p>
+            </section>
+          ))}
+        </div>
+      ) : <p>{analysis.answer}</p>}
+      {analysis.links.length ? (
+        <div className="crm-inline-analysis-links">
+          {analysis.links.map(link => <Link key={link.href} href={link.href}>{link.label}</Link>)}
+        </div>
+      ) : null}
+      <div className="crm-inline-analysis-actions">
+        <CrmButton onClick={onCreateTask} disabled={busy === `analysis-task-${analysis.id}`}>Create task from next action</CrmButton>
+        <CrmButton onClick={onSaveNote} disabled={busy === `analysis-note-${analysis.id}`}>Save as note</CrmButton>
+      </div>
+    </article>
   )
 }
 
@@ -800,6 +940,44 @@ function Fact({ label, value, empty }: { label: string; value: string; empty?: b
 
 function askHalvex(query: string, dealId: string) {
   window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query, dealId } }))
+}
+
+function parseInlineAnalysisSections(answer: string) {
+  const sections: Array<{ label: string; body: string }> = []
+  let current: { label: string; body: string } | null = null
+  const knownLabels = new Set(['what happened', 'what it means', 'next', 'check', 'evidence', 'suggested action', 'confidence', 'subject', 'body'])
+
+  for (const rawLine of answer.split('\n')) {
+    const line = rawLine.trim()
+    if (!line) {
+      if (current?.body && !current.body.endsWith('\n')) current.body += '\n'
+      continue
+    }
+    const match = line.match(/^([^:]{2,42}):\s*(.*)$/)
+    const key = match?.[1]?.trim().toLowerCase()
+    if (match && key && knownLabels.has(key)) {
+      if (current) sections.push({ label: current.label, body: current.body.trim() })
+      current = { label: sentenceLabel(match[1]), body: match[2]?.trim() ?? '' }
+      continue
+    }
+    if (!current) current = { label: 'Answer', body: '' }
+    current.body = [current.body, line].filter(Boolean).join(current.body.endsWith('\n') ? '' : '\n')
+  }
+  if (current) sections.push({ label: current.label, body: current.body.trim() })
+  return sections.filter(section => section.body)
+}
+
+function extractSuggestedAction(answer: string) {
+  const sections = parseInlineAnalysisSections(answer)
+  const preferred = sections.find(section => /next|suggested action/i.test(section.label))
+  const source = preferred?.body || sections[0]?.body || answer
+  const firstSentence = source.split(/\n|(?<=\.)\s+/).map(line => line.trim()).find(Boolean)
+  return firstSentence ? compact(firstSentence.replace(/^[-•]\s*/, ''), 140) : null
+}
+
+function sentenceLabel(value: string) {
+  const lower = value.trim().toLowerCase()
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
 function toInputDate(value?: string | Date | null) {
