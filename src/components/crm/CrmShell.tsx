@@ -6,11 +6,13 @@ import type { DetailsHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLA
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot,
+  BriefcaseBusiness,
   Building2,
   CheckCircle2,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  CircleDollarSign,
   Command,
   GalleryVerticalEnd,
   Home,
@@ -22,6 +24,7 @@ import {
   Send,
   Settings,
   Sparkles,
+  UserRound,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -936,7 +939,9 @@ export function CompactTaskCard({ task, actions }: { task: any; actions?: ReactN
 
 export function CompactPipelineCard({ deal, stages, onMove, moving }: { deal: any; stages?: any[]; onMove?: (dealId: string, stageId: string) => void; moving?: boolean }) {
   const router = useRouter()
-  const next = deal.aiNextAction || deal.intelligence?.riskDrivers?.[0] || 'Set next step.'
+  const owner = deal.ownerEmail ? String(deal.ownerEmail).split('@')[0] : 'Unassigned'
+  const kind = deal.source ? String(deal.source) : 'New business'
+  const initials = (deal.companyName || deal.title || 'H').split(/\s+/).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase()
   return (
     <article
       className="crm-pipeline-card"
@@ -948,23 +953,26 @@ export function CompactPipelineCard({ deal, stages, onMove, moving }: { deal: an
       }}
       aria-label={`Open ${deal.title}`}
     >
-      <div className="crm-pipeline-card-title">
-        <strong><ClampedText lines={2} title={deal.title}>{deal.title}</ClampedText></strong>
-        <span className={!deal.companyName ? 'muted' : ''}>{deal.companyName ?? 'Company missing'}</span>
-      </div>
-      <div className="crm-deal-card-meta">
-        <span className={!deal.valueAmount ? 'muted' : ''}>{money(deal.valueAmount)}</span>
-        <span className={!deal.expectedCloseDate ? 'muted' : ''}>{shortDate(deal.expectedCloseDate) ?? 'Close missing'}</span>
+      <div className="crm-pipeline-card-top">
+        <span className="crm-pipeline-logo" aria-hidden="true">{initials || 'H'}</span>
         <CrmRiskBadge risk={deal.aiRiskLevel} />
       </div>
-      <p className="crm-card-next"><span>Next action</span><ClampedText lines={2} title={next}>{next}</ClampedText></p>
+      <div className="crm-pipeline-card-title">
+        <strong><ClampedText lines={1} title={deal.title}>{deal.title}</ClampedText></strong>
+      </div>
+      <div className="crm-pipeline-card-rows">
+        <span className={!deal.companyName ? 'muted' : ''}><BriefcaseBusiness size={16} /> {deal.companyName ?? 'Company missing'}</span>
+        <span><LayoutGrid size={16} /> {kind}</span>
+        <span><UserRound size={16} /> {owner}</span>
+        <span className={!deal.valueAmount ? 'muted' : ''}><CircleDollarSign size={17} /> {money(deal.valueAmount)}</span>
+      </div>
+      {deal.expectedCloseDate ? <p className="crm-pipeline-card-foot">Close {shortDate(deal.expectedCloseDate)}</p> : null}
       <div className="crm-pipeline-card-actions" onClick={event => event.stopPropagation()}>
         {stages?.length && onMove ? (
           <select className="crm-select" value={deal.stageId ?? ''} disabled={moving} onChange={event => onMove(deal.id, event.target.value)} aria-label={`Move ${deal.title}`}>
             {stages.map(stage => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
           </select>
         ) : null}
-        <CrmButton href={`/deals/${deal.id}`} tone="ghost">Open</CrmButton>
       </div>
     </article>
   )

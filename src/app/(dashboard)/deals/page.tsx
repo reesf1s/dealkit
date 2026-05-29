@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Bot, LayoutGrid, List, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { Bot, CalendarCheck, CheckSquare, CircleDollarSign, LayoutGrid, List, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
   CrmBadge,
@@ -169,7 +169,7 @@ function DealsContent() {
 
   return (
     <CrmPage wide>
-      <section className="app-page-head">
+      <section className="app-page-head pipeline-page-head">
         <div>
           <span className="app-kicker">Pipeline</span>
           <h1>Pipeline</h1>
@@ -185,17 +185,12 @@ function DealsContent() {
 
       {quickAddOpen ? <QuickAddDeal onCancel={() => setQuickAddOpen(false)} onCreated={async (id) => { await mutate(); router.push(`/deals/${id}`) }} /> : null}
 
-      <section className="app-metric-grid">
-        <MetricCard label="Open deals" value={openDeals.length} />
-        <MetricCard label="Open value" value={money(openValue)} />
-        <MetricCard label="Next step missing" value={noNext} />
-        <MetricCard label="Review" value={needsReview} />
-      </section>
+      <PipelineInsightTimeline deals={openDeals} needsReview={needsReview} />
 
       <section className="app-card app-pipeline-shell">
         <CardHeader
           icon={<LayoutGrid size={18} />}
-          title="Deal records"
+          title="Opportunities"
           action={<ViewTabs tabs={[
             { href: '/deals?view=list', label: 'List', active: view === 'list', icon: <List size={14} /> },
             { href: '/deals?view=pipeline', label: 'Pipeline', active: view === 'pipeline', icon: <LayoutGrid size={14} /> },
@@ -272,10 +267,6 @@ function DealsContent() {
       </section>
     </CrmPage>
   )
-}
-
-function MetricCard({ label, value }: { label: string; value: string | number }) {
-  return <article className="app-metric-card"><span>{label}</span><strong>{value}</strong></article>
 }
 
 function CardHeader({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
@@ -417,17 +408,80 @@ function PipelineView({ stages, deals, onMove, movingId }: { stages: any[]; deal
           return (
             <section key={stage.id} className="crm-stage" role="listitem">
               <div className="crm-stage-header">
-                <h3>{stage.name}</h3>
-                <p>{stageDeals.length} deals · {money(value)}</p>
+                <div>
+                  <h3><span aria-hidden="true" />{stage.name}</h3>
+                  <p>{money(value)}</p>
+                </div>
+                <strong>{stageDeals.length}</strong>
               </div>
               <div className="crm-stage-list">
-                {stageDeals.length ? stageDeals.map(deal => <PipelineDealCard key={deal.id} deal={deal} stages={stages} onMove={onMove} moving={movingId === deal.id} />) : <CrmEmpty title="Empty" />}
+                {stageDeals.length ? stageDeals.map(deal => <PipelineDealCard key={deal.id} deal={deal} stages={stages} onMove={onMove} moving={movingId === deal.id} />) : <CrmEmpty title="No opportunities" />}
               </div>
             </section>
           )
         })}
       </div>
     </div>
+  )
+}
+
+function PipelineInsightTimeline({ deals, needsReview }: { deals: any[]; needsReview: number }) {
+  const closingSoon = deals
+    .filter(deal => daysUntil(deal.expectedCloseDate) != null && Number(daysUntil(deal.expectedCloseDate)) <= 14)
+    .sort((a, b) => dateValue(a.expectedCloseDate) - dateValue(b.expectedCloseDate))[0]
+  const highValue = [...deals].sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0))[0]
+  const stale = deals.find(deal => !deal.aiNextAction && !deal.nextStepDueAt)
+  const suggested = stale ?? closingSoon ?? highValue
+  const due = suggested?.expectedCloseDate ? shortDate(suggested.expectedCloseDate) : 'Today'
+  return (
+    <section className="pipeline-insight-canvas" aria-label="Pipeline insights">
+      <div className="pipeline-insight-copy">
+        <span>Pipeline insights</span>
+        <h2>See what&apos;s happening across deals and why</h2>
+        <p>Spot stalled opportunities, clustered objections, overdue next steps, and closing pressure without digging through every record.</p>
+      </div>
+      <div className="pipeline-insight-timeline">
+        <div className="pipeline-insight-line" aria-hidden="true" />
+        <TimelineMoment position="17%" time="2h ago" icon={<CalendarCheck size={17} />} label={closingSoon ? 'Close date approaching' : 'Pipeline checked'} deal={closingSoon} fallback="No close dates due soon" />
+        <TimelineMoment position="47%" time="23m ago" icon={<CheckSquare size={17} />} label={stale ? 'Next step missing' : 'Task coverage reviewed'} deal={stale} fallback="Open deals have next steps" accent />
+        <TimelineMoment position="84%" time="Just now" icon={<CircleDollarSign size={17} />} label={highValue ? 'Largest deal reviewed' : 'Forecast ready'} deal={highValue} fallback="Add values to weight the pipeline" />
+        <article className="pipeline-suggestion-card">
+          <span>Why this was suggested</span>
+          {suggested ? (
+            <>
+              <p>{stale ? `${suggested.companyName ?? suggested.title} has no saved next step, so it can quietly stall even if the deal is still open.` : closingSoon ? `${suggested.companyName ?? suggested.title} is approaching its close date and should have clear evidence for the next move.` : `${suggested.companyName ?? suggested.title} is the largest open opportunity and deserves a clean action plan.`}</p>
+              <div className="pipeline-suggestion-task"><CheckSquare size={17} /> {stale ? `Set a next step for ${suggested.companyName ?? suggested.title}` : `Review ${suggested.companyName ?? suggested.title}`}</div>
+              <dl>
+                <div><dt>Status</dt><dd>Todo</dd></div>
+                <div><dt>Assignee</dt><dd>{ownerLabel(suggested.ownerEmail)}</dd></div>
+                <div><dt>Related record</dt><dd><Link href={`/deals/${suggested.id}`}>{suggested.companyName ?? suggested.title}</Link></dd></div>
+                <div><dt>Due date</dt><dd>{due}</dd></div>
+                <div><dt>Source</dt><dd>{needsReview ? `${needsReview} records need review` : 'Pipeline analysis'}</dd></div>
+              </dl>
+            </>
+          ) : (
+            <>
+              <p>Create your first opportunities and Halvex will surface the deals that need a task, note, or field update.</p>
+              <div className="pipeline-suggestion-task"><CheckSquare size={17} /> Add a deal with company, value, close date, and next step</div>
+            </>
+          )}
+        </article>
+      </div>
+    </section>
+  )
+}
+
+function TimelineMoment({ position, time, icon, label, deal, fallback, accent = false }: { position: string; time: string; icon: ReactNode; label: string; deal?: any; fallback: string; accent?: boolean }) {
+  return (
+    <article className={`pipeline-moment ${accent ? 'accent' : ''}`} style={{ left: position }}>
+      <span className="pipeline-moment-time">{time}</span>
+      <span className="pipeline-moment-dot" aria-hidden="true" />
+      <div className="pipeline-moment-pill">
+        {icon}
+        <strong>{label}</strong>
+        {deal ? <Link href={`/deals/${deal.id}`}>{deal.companyName ?? deal.title}</Link> : <small>{fallback}</small>}
+      </div>
+    </article>
   )
 }
 
@@ -492,4 +546,12 @@ function dealPriority(deal: any) {
   if (deal.aiRiskLevel === 'high' || (!deal.aiNextAction && deal.status === 'open')) return 'High'
   if (!deal.expectedCloseDate || !deal.valueAmount) return 'Medium'
   return 'Normal'
+}
+
+function daysUntil(value?: string | Date | null) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  const time = date.getTime()
+  if (!Number.isFinite(time)) return null
+  return Math.ceil((time - Date.now()) / 86_400_000)
 }

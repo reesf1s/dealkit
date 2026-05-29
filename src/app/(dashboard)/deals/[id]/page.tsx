@@ -112,6 +112,9 @@ export default function DealRecordPage() {
         <div className="app-record-layout">
           <main className="app-record-main">
             {activeTab === 'overview' ? (
+              <DealAnalystPanel context={context} health={health} onChanged={mutate} onRefresh={refreshHealth} />
+            ) : null}
+            {activeTab === 'overview' ? (
               <OverviewTab context={context} deal={deal} stages={stages} health={health} onUpdate={updateDeal} onTab={setActiveTab} />
             ) : null}
             {activeTab === 'tasks' ? <TasksTab context={context} onChanged={mutate} /> : null}
@@ -121,7 +124,6 @@ export default function DealRecordPage() {
           </main>
 
           <aside className="app-record-side">
-            <DealAnalystPanel context={context} health={health} onChanged={mutate} onRefresh={refreshHealth} />
             <RecordContextPanel context={context} deal={deal} health={health} onTab={setActiveTab} />
           </aside>
         </div>
@@ -621,6 +623,14 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
   const [analysis, setAnalysis] = useState<InlineAnalysis | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState<string | null>(null)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [customPrompt, setCustomPrompt] = useState('')
+  const activeInsights = insights.filter(insight => !dismissed.has(insight.id))
+  const primaryInsight = activeInsights[0]
+  const brief = buildAnalystBrief(context, health)
+  const latestEvidence = context?.intelligence?.latestEvidence?.text
+    || context?.latestActivities?.[0]?.summary
+    || context?.latestActivities?.[0]?.body
+    || ''
 
   async function runAnalysis(label: string, prompt: string) {
     setAnalysisLoading(label)
@@ -732,74 +742,100 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
     }
   }
 
+  async function submitCustomPrompt(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const prompt = customPrompt.trim()
+    if (!prompt) return
+    await runAnalysis('Custom question', `${prompt}\n\nUse only the CRM record for ${deal.title}. Cite the exact saved field, note, task, or activity that supports the answer. If the evidence is thin, say so plainly and suggest one CRM action.`)
+    setCustomPrompt('')
+  }
+
   return (
-    <CrmPanel className="crm-analyst-panel">
+    <CrmPanel className="crm-analyst-panel deal-assistant-panel">
       <div className="crm-analyst-head">
         <div>
-          <span>Contextual AI</span>
-          <h2>Deal intelligence</h2>
+          <span>Embedded analyst</span>
+          <h2>Ask Halvex about this deal</h2>
         </div>
         <button type="button" onClick={onRefresh} aria-label="Refresh deal analysis"><RefreshCw size={16} /></button>
       </div>
 
-      <div className="crm-analyst-score-grid">
-        <div><span>Score</span><strong>{health.score ?? '—'}</strong></div>
-        <div><span>Confidence</span><strong>{health.confidence ? `${health.confidence}%` : '—'}</strong></div>
-        <div><span>Risk</span><CrmRiskBadge risk={health.risk} /></div>
-      </div>
-
-      <AnalystBrief context={context} health={health} />
-
-      <div className="crm-analyst-actions">
-        <CrmButton tone="primary" onClick={() => runAnalysis('Deal analysis', `Analyse ${deal.title}. Use only this deal record. Return sections exactly: What changed:, Risk:, Evidence:, Recommended action:. Include confidence limits when CRM evidence is thin. Do not use generic sales language.`)} disabled={Boolean(analysisLoading)}><Bot size={16} /> {analysisLoading === 'Deal analysis' ? 'Analysing...' : 'Analyse deal'}</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Next step', `Suggest the next step for ${deal.title}. Return sections exactly: Evidence:, Recommended action:, Confidence:. Make the action a concrete CRM task or field update.`)} disabled={Boolean(analysisLoading)}><CheckCircle2 size={16} /> Next step</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Follow-up draft', `Draft a concise follow-up for ${deal.title} based only on saved CRM context. Return Subject: and Body:. Do not invent names or commitments.`)} disabled={Boolean(analysisLoading)}><MailPlus size={16} /> Follow-up</CrmButton>
-        <CrmButton onClick={() => runAnalysis('CRM extraction', `Extract CRM updates from the latest note on ${deal.title}. Return sections exactly: Field updates:, Tasks:, Notes:. Do not apply anything automatically.`)} disabled={Boolean(analysisLoading)}><NotebookPen size={16} /> Extract note</CrmButton>
-      </div>
-
-      {analysisError ? <div className="crm-analyst-error">{analysisError}</div> : null}
-      {analysisLoading && !analysis ? <InlineAnalysisSkeleton label={analysisLoading} /> : null}
-      {analysis ? (
-        <InlineAnalysisResult
-          analysis={analysis}
-          busy={busyId}
-          onSaveNote={saveAnalysisAsNote}
-          onCreateTask={createTaskFromAnalysis}
-          onOpenDrawer={() => askHalvex(analysis.prompt, deal.id)}
-        />
-      ) : null}
-
-      <div className="crm-analyst-insights">
-        {insights.length ? <div className="crm-analyst-insights-head"><strong>Recommended checks</strong><span>{insights.filter(insight => !dismissed.has(insight.id)).length}</span></div> : null}
-        {insights.length ? insights.filter(insight => !dismissed.has(insight.id)).map(insight => (
-          <article key={insight.id} className="crm-analyst-insight">
-            <header>
-              <div>
-                <span>{insight.type}</span>
-                <h3>{insight.title}</h3>
-              </div>
-              <div className="crm-analyst-insight-meta"><CrmRiskBadge risk={insight.risk} /><strong>{insight.confidence}%</strong></div>
-            </header>
-            <p>{insight.explanation}</p>
-            <section>
-              <h4>Evidence</h4>
-              <p>{insight.evidence}</p>
-            </section>
-            <section>
-              <h4>Suggested action</h4>
-              <p>{insight.suggestedAction}</p>
-            </section>
-            <div className="crm-analyst-insight-actions">
-              <CrmButton onClick={() => createTask(insight)} disabled={busyId === insight.id}>Make task</CrmButton>
-              <CrmButton onClick={() => createNote(insight, 'noted')} disabled={busyId === insight.id}>Save note</CrmButton>
-              <CrmButton onClick={() => createNote(insight, 'accepted')} disabled={busyId === insight.id}>Accept</CrmButton>
-              <CrmButton onClick={() => createNote(insight, 'dismissed')} disabled={busyId === insight.id}>Dismiss</CrmButton>
+      <div className="deal-assistant-shell">
+        <div className="deal-assistant-thread" aria-live="polite">
+          <div className="deal-assistant-message user">
+            <p>What matters on {deal.title} right now?</p>
+          </div>
+          <div className="deal-assistant-message assistant">
+            <div className="deal-assistant-brand"><Bot size={16} /><span>Halvex</span></div>
+            <h3>{brief.title}</h3>
+            <p>{brief.body}</p>
+            <div className="deal-assistant-evidence">
+              <section>
+                <span>Evidence</span>
+                <p>{latestEvidence ? compact(latestEvidence, 220) : brief.evidence}</p>
+              </section>
+              <section>
+                <span>Missing</span>
+                <p>{brief.missing}</p>
+              </section>
+              <section>
+                <span>Confidence</span>
+                <p>{health.confidence ? `${health.confidence}% based on saved CRM context` : 'Add notes, people, and tasks for a stronger read'}</p>
+              </section>
             </div>
-          </article>
-        )) : (
-          <CrmEmpty title="No active risks">Run analysis after adding notes or tasks if you want Halvex to review the record.</CrmEmpty>
-        )}
-        {insights.length > 0 && insights.every(insight => dismissed.has(insight.id)) ? <CrmEmpty title="No active analysis" /> : null}
+            {brief.questions.length ? (
+              <div className="deal-assistant-questions">
+                {brief.questions.map(question => <span key={question}>{question}</span>)}
+              </div>
+            ) : null}
+          </div>
+
+          {primaryInsight ? (
+            <article className="deal-assistant-action-card">
+              <header>
+                <div>
+                  <span>{primaryInsight.type}</span>
+                  <h3>{primaryInsight.title}</h3>
+                </div>
+                <CrmRiskBadge risk={primaryInsight.risk} />
+              </header>
+              <p>{primaryInsight.explanation}</p>
+              <dl>
+                <div><dt>Why</dt><dd>{primaryInsight.evidence}</dd></div>
+                <div><dt>Action</dt><dd>{primaryInsight.suggestedAction}</dd></div>
+              </dl>
+              <div className="deal-assistant-card-actions">
+                <CrmButton onClick={() => createTask(primaryInsight)} disabled={busyId === primaryInsight.id}>Create task</CrmButton>
+                <CrmButton onClick={() => createNote(primaryInsight, 'noted')} disabled={busyId === primaryInsight.id}>Save note</CrmButton>
+                <CrmButton onClick={() => createNote(primaryInsight, 'dismissed')} disabled={busyId === primaryInsight.id}>Dismiss</CrmButton>
+              </div>
+            </article>
+          ) : null}
+
+          {analysisError ? <div className="crm-analyst-error">{analysisError}</div> : null}
+          {analysisLoading && !analysis ? <InlineAnalysisSkeleton label={analysisLoading} /> : null}
+          {analysis ? (
+            <InlineAnalysisResult
+              analysis={analysis}
+              busy={busyId}
+              onSaveNote={saveAnalysisAsNote}
+              onCreateTask={createTaskFromAnalysis}
+              onOpenDrawer={() => askHalvex(analysis.prompt, deal.id)}
+            />
+          ) : null}
+        </div>
+
+        <div className="deal-assistant-prompts">
+          <CrmButton tone="primary" onClick={() => runAnalysis('Deal analysis', `Analyse ${deal.title}. Use only this deal record. Return sections exactly: What changed:, Risk:, Evidence:, Recommended action:. Include confidence limits when CRM evidence is thin. Do not use generic sales language.`)} disabled={Boolean(analysisLoading)}><Bot size={16} /> {analysisLoading === 'Deal analysis' ? 'Analysing...' : 'Analyse'}</CrmButton>
+          <CrmButton onClick={() => runAnalysis('Next step', `Suggest the next step for ${deal.title}. Return sections exactly: Evidence:, Recommended action:, Confidence:. Make the action a concrete CRM task or field update.`)} disabled={Boolean(analysisLoading)}><CheckCircle2 size={16} /> Next step</CrmButton>
+          <CrmButton onClick={() => runAnalysis('Follow-up draft', `Draft a concise follow-up for ${deal.title} based only on saved CRM context. Return Subject: and Body:. Do not invent names or commitments.`)} disabled={Boolean(analysisLoading)}><MailPlus size={16} /> Follow-up</CrmButton>
+          <CrmButton onClick={() => runAnalysis('CRM extraction', `Extract CRM updates from the latest note on ${deal.title}. Return sections exactly: Field updates:, Tasks:, Notes:. Do not apply anything automatically.`)} disabled={Boolean(analysisLoading)}><NotebookPen size={16} /> Extract note</CrmButton>
+        </div>
+
+        <form className="deal-assistant-composer" onSubmit={submitCustomPrompt}>
+          <input value={customPrompt} onChange={event => setCustomPrompt(event.target.value)} placeholder={`Ask about ${deal.title}...`} />
+          <CrmButton type="submit" tone="primary" disabled={!customPrompt.trim() || Boolean(analysisLoading)}>Ask</CrmButton>
+        </form>
       </div>
     </CrmPanel>
   )
@@ -816,34 +852,6 @@ function InlineAnalysisSkeleton({ label }: { label: string }) {
       </header>
       <p>Reading deal context.</p>
     </article>
-  )
-}
-
-function AnalystBrief({ context, health }: { context: any; health: ReturnType<typeof buildHealth> }) {
-  const brief = buildAnalystBrief(context, health)
-  return (
-    <section className="crm-analyst-brief">
-      <span>{brief.label}</span>
-      <h3>{brief.title}</h3>
-      <p>{brief.body}</p>
-      <div className="crm-analyst-brief-grid">
-        <div>
-          <small>Evidence</small>
-          <strong>{brief.evidence}</strong>
-        </div>
-        <div>
-          <small>Missing</small>
-          <strong>{brief.missing}</strong>
-        </div>
-      </div>
-      {brief.next ? <div className="crm-analyst-brief-next"><small>Next</small><p>{brief.next}</p></div> : null}
-      {brief.questions.length ? (
-        <div className="crm-analyst-brief-questions">
-          <small>Ask next</small>
-          {brief.questions.map(question => <p key={question}>{question}</p>)}
-        </div>
-      ) : null}
-    </section>
   )
 }
 
