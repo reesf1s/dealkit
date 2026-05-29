@@ -192,6 +192,8 @@ function DealsContent() {
         <MetricCard label="Review" value={needsReview} />
       </section>
 
+      <PipelineCommandCenter deals={deals} allDeals={allDeals} stages={stages} onAnalyse={() => askHalvex('Analyse the pipeline report. Prioritise high-value deals, missing buyers, stale records, and next manual actions.')} />
+
       <section className="app-card app-pipeline-shell">
         <CardHeader
           icon={<LayoutGrid size={18} />}
@@ -276,6 +278,101 @@ function DealsContent() {
 
 function MetricCard({ label, value }: { label: string; value: string | number }) {
   return <article className="app-metric-card"><span>{label}</span><strong>{value}</strong></article>
+}
+
+function PipelineCommandCenter({ deals, allDeals, stages, onAnalyse }: { deals: any[]; allDeals: any[]; stages: any[]; onAnalyse: () => void }) {
+  const openDeals = deals.filter((deal: any) => deal.status === 'open')
+  const totalValue = openDeals.reduce((sum: number, deal: any) => sum + Number(deal.valueAmount ?? 0), 0)
+  const topDeal = [...openDeals].sort((a: any, b: any) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0))[0]
+  const riskCount = allDeals.filter((deal: any) => deal.aiRiskLevel === 'high').length
+  if (!openDeals.length) {
+    return (
+      <section className="app-command-center empty">
+        <div className="app-command-report">
+          <div className="app-command-head">
+            <div>
+              <span>Sales list</span>
+              <h2>Pipeline control</h2>
+              <p>Create a deal to unlock stage value, next-step gaps, and Halvex recommendations.</p>
+            </div>
+            <button type="button" onClick={onAnalyse}>Analyse</button>
+          </div>
+          <CrmEmpty title="No open deals yet" action={<CrmButton href="/deals?quick=deal" tone="primary"><Plus size={15} /> New deal</CrmButton>}>
+            Start with a real opportunity. The report view will fill with value, stage movement, risk, and manual next actions.
+          </CrmEmpty>
+        </div>
+        <aside className="app-command-side">
+          <article className="app-command-tile black"><small>Best deal</small><strong>{money(0)}</strong><span>No open deal</span></article>
+          <article className="app-command-tile"><small>Value</small><strong>{money(totalValue)}</strong><span>0 open</span></article>
+          <article className="app-command-tile accent"><small>Risk</small><strong>{riskCount}</strong><span>needs review</span></article>
+          <article className="app-command-list">
+            <header><strong>Next-step gaps</strong><span>0</span></header>
+            <p>No open deals yet.</p>
+          </article>
+        </aside>
+      </section>
+    )
+  }
+  const stageRows = (stages.length ? stages : [{ id: 'none', name: 'No stage' }]).map((stage: any) => {
+    const stageDeals = openDeals.filter((deal: any) => deal.stageId === stage.id || (!deal.stageId && stage.id === 'none'))
+    const value = stageDeals.reduce((sum: number, deal: any) => sum + Number(deal.valueAmount ?? 0), 0)
+    return { id: stage.id, label: stage.name, count: stageDeals.length, value }
+  }).filter((row: any) => row.count > 0).slice(0, 5)
+  const rows = stageRows
+  const maxValue = Math.max(1, ...rows.map((row: any) => row.value))
+  const needsStep = openDeals.filter((deal: any) => !deal.aiNextAction && !deal.nextStepDueAt).slice(0, 3)
+
+  return (
+    <section className="app-command-center">
+      <div className="app-command-report">
+        <div className="app-command-head">
+          <div>
+            <span>Sales list</span>
+            <h2>Pipeline control</h2>
+            <p>{openDeals.length} open · {money(totalValue)} in view</p>
+          </div>
+          <button type="button" onClick={onAnalyse}>Details</button>
+        </div>
+        <div className="app-command-track">
+          {rows.map((row: any) => (
+            <div key={row.id} style={{ '--bar-height': `${Math.max(18, Math.round((row.value / maxValue) * 100))}%` } as any}>
+              <span>{row.label}</span>
+              <strong>{money(row.value)}</strong>
+              <small>{row.count} deals</small>
+              <i />
+            </div>
+          ))}
+        </div>
+      </div>
+      <aside className="app-command-side">
+        <article className="app-command-tile black">
+          <small>Best deal</small>
+          <strong>{topDeal ? money(topDeal.valueAmount) : money(0)}</strong>
+          <span>{topDeal?.companyName ?? topDeal?.title ?? 'No open deal'}</span>
+        </article>
+        <article className="app-command-tile">
+          <small>Value</small>
+          <strong>{money(totalValue)}</strong>
+          <span>{openDeals.length} open</span>
+        </article>
+        <article className="app-command-tile accent">
+          <small>Risk</small>
+          <strong>{riskCount}</strong>
+          <span>needs review</span>
+        </article>
+        <article className="app-command-list">
+          <header><strong>Next-step gaps</strong><span>{needsStep.length}</span></header>
+          {(needsStep.length ? needsStep : openDeals.slice(0, 3)).map((deal: any) => (
+            <Link key={deal.id} href={`/deals/${deal.id}`}>
+              <span>{deal.companyName ?? deal.title}</span>
+              <strong>{deal.aiNextAction ? 'Ready' : 'Missing'}</strong>
+            </Link>
+          ))}
+          {!openDeals.length ? <p>No open deals yet.</p> : null}
+        </article>
+      </aside>
+    </section>
+  )
 }
 
 function CardHeader({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
