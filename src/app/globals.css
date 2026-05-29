@@ -12755,6 +12755,56 @@ body:has(.crm-shell) {
   font-weight: 760;
 }
 
+.crm-record-assistant {
+  overflow: hidden;
+}
+
+.crm-record-assistant-head {
+  margin: -18px -18px 0;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(36,95,70,.11);
+  background:
+    linear-gradient(135deg, rgba(36,95,70,.12), rgba(166,107,42,.08)),
+    rgba(255,255,252,.66);
+}
+
+.crm-record-assistant-head span {
+  display: block;
+  color: #245f46;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.crm-record-assistant-head h2 {
+  margin: 3px 0 0;
+  color: var(--crm-ink, #171916);
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.crm-record-assistant-head p {
+  margin: 5px 0 0;
+  color: rgba(23,25,22,.64);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.crm-record-assistant-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.crm-record-assistant-actions .crm-button {
+  min-height: 38px !important;
+  justify-content: flex-start !important;
+  white-space: normal;
+  line-height: 1.2;
+}
+
 .crm-task-board {
   display: grid;
   grid-template-columns: repeat(4, minmax(220px, 1fr));

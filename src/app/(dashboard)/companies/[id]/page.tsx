@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Bot, Building2, CheckCircle2, Clock3, Plus, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, RecordAssistantPanel, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +104,19 @@ export default function CompanyPage() {
           </CrmPanel>
         </main>
         <aside className="crm-record-side">
+          <RecordAssistantPanel
+            title="Account analyst"
+            description="Read this account in context, then decide whether the result becomes a note or a task."
+            recordName={company.name}
+            notePayload={{ companyId: company.id }}
+            taskPayload={{ companyId: company.id }}
+            onChanged={async () => { await Promise.all([mutateNotes(), mutateTasks()]) }}
+            prompts={[
+              { label: 'Account read', primary: true, prompt: `Give me the account read for ${company.name}: company fields, linked people, open deals, open tasks, notes, risk, evidence, and the next manual action.` },
+              { label: 'Find gaps', prompt: `Find stale work, missing stakeholders, incomplete fields, and next actions for the ${company.name} account. Use evidence from saved CRM context.` },
+              { label: 'Draft follow-up', prompt: `Draft a concise account follow-up for ${company.name} using saved CRM context only.` },
+            ]}
+          />
           <CrmPanel>
             <CrmSectionHeader title="Account work" description="Manual CRM actions first." />
             <div className="crm-stack">

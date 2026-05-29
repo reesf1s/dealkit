@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Bot, BriefcaseBusiness, CheckCircle2, Clock3, MailPlus, Plus, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, RecordAssistantPanel, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,6 +98,19 @@ export default function PersonPage() {
           </CrmPanel>
         </main>
         <aside className="crm-record-side">
+          <RecordAssistantPanel
+            title="Relationship analyst"
+            description="Read this person in context, then save useful output as relationship memory or a follow-up task."
+            recordName={person.fullName}
+            notePayload={{ contactId: person.id }}
+            taskPayload={{ contactId: person.id }}
+            onChanged={async () => { await Promise.all([mutateNotes(), mutateTasks()]) }}
+            prompts={[
+              { label: 'Relationship read', primary: true, prompt: `Summarise ${person.fullName}: company, role, linked deals, open tasks, notes, evidence, missing CRM fields, and suggested next touch.` },
+              { label: 'Find buyer gaps', prompt: `Find missing buyer information for ${person.fullName}: role in deal, champion/economic buyer status, decision influence, urgency, objections, and evidence.` },
+              { label: 'Draft follow-up', prompt: `Draft a concise follow-up to ${person.fullName} using saved CRM context only.` },
+            ]}
+          />
           <CrmPanel>
             <CrmSectionHeader title="Relationship quality" description="What makes this person useful inside the CRM." />
             <div className="crm-stack">

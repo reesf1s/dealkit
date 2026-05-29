@@ -17,6 +17,7 @@ import {
   Home,
   LayoutGrid,
   Loader2,
+  NotebookPen,
   Plus,
   Search,
   Send,
@@ -63,6 +64,12 @@ type CommandRecord = {
   label: string
   detail: string
   href: string
+}
+
+type RecordAssistantPrompt = {
+  label: string
+  prompt: string
+  primary?: boolean
 }
 
 function active(pathname: string, href: string) {
@@ -1006,6 +1013,192 @@ export function ObjectStartState({ label, title, description, primaryAction, sec
       </div>
     </section>
   )
+}
+
+export function RecordAssistantPanel({
+  title = 'Halvex analyst',
+  description = 'Optional intelligence that stays attached to this record.',
+  recordName,
+  prompts,
+  notePayload,
+  taskPayload,
+  onChanged,
+}: {
+  title?: string
+  description?: string
+  recordName: string
+  prompts: RecordAssistantPrompt[]
+  notePayload: Record<string, unknown>
+  taskPayload: Record<string, unknown>
+  onChanged?: () => void | Promise<void>
+}) {
+  const [result, setResult] = useState<{ label: string; prompt: string; answer: string; links: Array<{ label: string; href: string }>; createdAt: Date } | null>(null)
+  const [loading, setLoading] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run(prompt: RecordAssistantPrompt) {
+    setLoading(prompt.label)
+    setError(null)
+    try {
+      const response = await fetch('/api/crm/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt.prompt }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error ?? 'Halvex could not read this record yet.')
+      setResult({
+        label: prompt.label,
+        prompt: prompt.prompt,
+        answer: payload?.data?.answer || 'Halvex did not return a useful answer.',
+        links: payload?.data?.links ?? [],
+        createdAt: new Date(),
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Halvex could not read this record yet.')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function saveNote() {
+    if (!result) return
+    setBusy('note')
+    try {
+      await fetch('/api/crm/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...notePayload,
+          note: [`Halvex ${result.label} for ${recordName}`, result.answer].join('\n\n'),
+        }),
+      })
+      await onChanged?.()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function createTask() {
+    if (!result) return
+    const title = extractRecordAssistantAction(result.answer) || `Review ${recordName} and update the next action`
+    setBusy('task')
+    try {
+      await fetch('/api/crm/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...taskPayload,
+          title,
+          priority: 'normal',
+        }),
+      })
+      await onChanged?.()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <CrmPanel className="crm-record-assistant">
+      <div className="crm-record-assistant-head">
+        <div>
+          <span>Contextual AI</span>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+      </div>
+      <div className="crm-record-assistant-actions">
+        {prompts.map(prompt => (
+          <CrmButton key={prompt.label} tone={prompt.primary ? 'primary' : 'default'} onClick={() => run(prompt)} disabled={Boolean(loading)}>
+            {prompt.primary ? <Bot size={16} /> : <Sparkles size={16} />}
+            {loading === prompt.label ? 'Reading...' : prompt.label}
+          </CrmButton>
+        ))}
+      </div>
+      {error ? <div className="crm-analyst-error">{error}</div> : null}
+      {loading && !result ? (
+        <article className="crm-inline-analysis loading">
+          <header><div><span>Running</span><h3>{loading}</h3></div></header>
+          <p>Reading saved CRM context before returning an evidence-based recommendation.</p>
+        </article>
+      ) : null}
+      {result ? (
+        <article className="crm-inline-analysis">
+          <header>
+            <div>
+              <span>Latest result · {shortDate(result.createdAt) ?? 'now'}</span>
+              <h3>{result.label}</h3>
+            </div>
+          </header>
+          <RecordAssistantSections answer={result.answer} />
+          {result.links.length ? (
+            <div className="crm-inline-analysis-links">
+              {result.links.map(link => <Link key={link.href} href={link.href}>{link.label}</Link>)}
+            </div>
+          ) : null}
+          <div className="crm-inline-analysis-actions">
+            <CrmButton onClick={createTask} disabled={busy === 'task'}><CheckCircle2 size={16} /> Create task</CrmButton>
+            <CrmButton onClick={saveNote} disabled={busy === 'note'}><NotebookPen size={16} /> Save note</CrmButton>
+          </div>
+        </article>
+      ) : null}
+    </CrmPanel>
+  )
+}
+
+function RecordAssistantSections({ answer }: { answer: string }) {
+  const sections = parseRecordAssistantSections(answer)
+  if (!sections.length) return <p>{answer}</p>
+  return (
+    <div className="crm-inline-analysis-sections">
+      {sections.map(section => (
+        <section key={section.label}>
+          <h4>{section.label}</h4>
+          <p>{section.body}</p>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function parseRecordAssistantSections(answer: string) {
+  const labels = new Set(['what happened', 'what it means', 'next', 'check', 'evidence', 'suggested action', 'confidence', 'subject', 'body'])
+  const sections: Array<{ label: string; body: string }> = []
+  let current: { label: string; body: string } | null = null
+
+  for (const rawLine of answer.split('\n')) {
+    const line = rawLine.trim()
+    if (!line) {
+      if (current?.body && !current.body.endsWith('\n')) current.body += '\n'
+      continue
+    }
+    const match = line.match(/^([^:]{2,42}):\s*(.*)$/)
+    const key = match?.[1]?.trim().toLowerCase()
+    if (match && key && labels.has(key)) {
+      if (current) sections.push({ label: current.label, body: current.body.trim() })
+      current = { label: sentenceCaseLabel(match[1]), body: match[2]?.trim() ?? '' }
+      continue
+    }
+    if (!current) current = { label: 'Answer', body: '' }
+    current.body = [current.body, line].filter(Boolean).join(current.body.endsWith('\n') ? '' : '\n')
+  }
+  if (current) sections.push({ label: current.label, body: current.body.trim() })
+  return sections.filter(section => section.body)
+}
+
+function extractRecordAssistantAction(answer: string) {
+  const sections = parseRecordAssistantSections(answer)
+  const preferred = sections.find(section => /next|suggested action/i.test(section.label))
+  const source = preferred?.body || sections[0]?.body || answer
+  const first = source.split(/\n|(?<=\.)\s+/).map(line => line.trim()).find(Boolean)
+  return first ? compact(first.replace(/^[-•]\s*/, ''), 140) : null
+}
+
+function sentenceCaseLabel(value: string) {
+  const lower = value.trim().toLowerCase()
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
 export function CrmSkeleton({ rows = 4 }: { rows?: number }) {
