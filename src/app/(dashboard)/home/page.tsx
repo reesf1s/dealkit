@@ -1,9 +1,10 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
-import { CheckCircle2, LayoutGrid, Plus } from 'lucide-react'
+import { Building2, CheckCircle2, Clock3, LayoutGrid, Plus, Sparkles } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
   CrmButton,
@@ -11,11 +12,7 @@ import {
   CompactDealCard,
   CrmEmpty,
   CrmPage,
-  CrmPanel,
-  CrmSectionHeader,
   CrmSkeleton,
-  CrmStat,
-  ObjectWorkspaceHeader,
   money,
 } from '@/components/crm/CrmShell'
 
@@ -39,7 +36,6 @@ export default function HomePage() {
   const activeDeals = [...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? []), ...(home?.dealIntelligence ?? [])]
     .filter((deal, index, all) => all.findIndex(item => item.id === deal.id) === index)
     .slice(0, 6)
-  const isEmptyWorkspace = !isLoading && priorities.length === 0 && activeDeals.length === 0 && Number(home?.openPipelineValue ?? 0) === 0
 
   async function completePriority(priority: HomeData['priorities'][number]) {
     if (priority.linkedType !== 'task') return
@@ -58,74 +54,87 @@ export default function HomePage() {
 
   return (
     <CrmPage wide>
-      <ObjectWorkspaceHeader
-        object="Home"
-        title="Home"
-        actions={!isEmptyWorkspace ? <><CrmButton href="/tasks?quick=task" tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals?quick=deal"><Plus size={16} /> Add deal</CrmButton></> : undefined}
-        stats={!isEmptyWorkspace ? <>
-        <CrmStat label="Tasks due" value={priorities.length} hint={priorities.length ? 'Review or complete' : 'Clear'} />
-        <CrmStat label="Open pipeline" value={money(home?.openPipelineValue ?? 0)} />
-        <CrmStat label="Likely closers" value={(home?.likelyClosers ?? []).length} />
-        <CrmStat label="At risk" value={(home?.atRiskDeals ?? []).length} />
-        </> : undefined}
-      />
+      <section className="app-page-head">
+        <div>
+          <span className="app-kicker">Home</span>
+          <h1>Today</h1>
+          <p>{money(home?.openPipelineValue ?? 0)} pipeline · {priorities.length} due · {activeDeals.length} active</p>
+        </div>
+        <div className="app-page-actions">
+          <CrmButton href="/companies?quick=company"><Building2 size={16} /> Company</CrmButton>
+          <CrmButton href="/deals?quick=deal" tone="primary"><Plus size={16} /> Deal</CrmButton>
+        </div>
+      </section>
 
-      {isEmptyWorkspace ? (
-        <CrmPanel className="crm-record-workbench crm-home-empty">
-          <CrmEmpty title="No records yet" action={<><CrmButton href="/companies?quick=company" tone="primary">Add company</CrmButton><CrmButton href="/deals?quick=deal">Add deal</CrmButton></>}>
-          </CrmEmpty>
-        </CrmPanel>
-      ) : null}
+      <section className="app-metric-grid">
+        <MetricCard label="Open pipeline" value={money(home?.openPipelineValue ?? 0)} />
+        <MetricCard label="Due" value={priorities.length} />
+        <MetricCard label="At risk" value={(home?.atRiskDeals ?? []).length} />
+        <MetricCard label="Closing" value={(home?.likelyClosers ?? []).length} />
+      </section>
 
-      {!isEmptyWorkspace ? <div className="crm-home-desk">
-        <CrmPanel className="crm-home-primary">
-          <CrmSectionHeader title="Tasks due" action={<CrmButton href="/tasks">All tasks</CrmButton>} />
-          <div className="crm-stack">
+      <section className="app-dashboard-grid">
+        <div className="app-card app-card-large">
+          <CardHeader icon={<CheckCircle2 size={18} />} title="Work" action={<CrmButton href="/tasks">Tasks</CrmButton>} />
+          <div className="app-list">
             {isLoading ? <CrmSkeleton rows={4} /> : priorities.length ? priorities.slice(0, 6).map(priority => (
-              <article key={priority.id} className="crm-work-row">
-                <span className="crm-icon"><CheckCircle2 size={17} /></span>
+              <article key={priority.id} className="app-row">
+                <span className="app-row-icon"><CheckCircle2 size={16} /></span>
                 <div>
-                  <strong><ClampedText lines={2} title={priority.title}>{priority.title}</ClampedText></strong>
-                  <p><ClampedText lines={2}>{priority.reason}</ClampedText></p>
+                  <strong><ClampedText lines={1} title={priority.title}>{priority.title}</ClampedText></strong>
+                  <p><ClampedText lines={1}>{priority.reason}</ClampedText></p>
                 </div>
-                <div className="crm-form-actions">
+                <div className="app-row-actions">
                   {priority.dealId ? <CrmButton href={`/deals/${priority.dealId}`} tone="ghost">Open</CrmButton> : null}
                   {priority.linkedType === 'task' ? <CrmButton onClick={() => completePriority(priority)} disabled={completingId === priority.id}>Done</CrmButton> : null}
                 </div>
               </article>
-            )) : (
-              <CrmEmpty title="No tasks due" action={<CrmButton href="/tasks?quick=task" tone="primary">Add task</CrmButton>}>
-              </CrmEmpty>
-            )}
+            )) : <CrmEmpty title="No tasks due" action={<CrmButton href="/tasks?quick=task" tone="primary">Add task</CrmButton>} />}
           </div>
-        </CrmPanel>
-      </div> : null}
+        </div>
 
-      {!isEmptyWorkspace ? <CrmPanel className="crm-home-deals">
-        <CrmSectionHeader title="Active deals" action={<CrmButton href="/deals"><LayoutGrid size={16} /> Deals</CrmButton>} />
+        <div className="app-card app-ai-card">
+          <CardHeader icon={<Sparkles size={18} />} title="Halvex" />
+          <button type="button" onClick={() => askHalvex('Analyse pipeline and list the records that need attention today.')}>Analyse pipeline</button>
+          <button type="button" onClick={() => askHalvex('Find missing next steps, buyer gaps, and stale records in this workspace.')}>Find gaps</button>
+          <button type="button" onClick={() => askHalvex('Draft a concise follow-up for the highest priority open deal.')}>Draft follow-up</button>
+        </div>
+      </section>
+
+      <section className="app-card">
+        <CardHeader icon={<LayoutGrid size={18} />} title="Pipeline" action={<CrmButton href="/deals">Deals</CrmButton>} />
         {isLoading ? <CrmSkeleton rows={5} /> : activeDeals.length ? (
-          <div className="crm-grid-3">
+          <div className="app-card-grid">
             {activeDeals.map(deal => <CompactDealCard key={deal.id} deal={deal} />)}
           </div>
-        ) : (
-          <CrmEmpty title="No active deals" action={<CrmButton href="/deals?quick=deal" tone="primary">Add deal</CrmButton>}>
-          </CrmEmpty>
-        )}
-      </CrmPanel> : null}
+        ) : <CrmEmpty title="No active deals" action={<CrmButton href="/deals?quick=deal" tone="primary">Add deal</CrmButton>} />}
+      </section>
 
-      {!isEmptyWorkspace ? <CrmPanel>
-        <CrmSectionHeader title="Recent records" />
+      <section className="app-card">
+        <CardHeader icon={<Clock3 size={18} />} title="Recent" />
         {activeDeals.length ? (
-          <div className="crm-continuation-strip">
+          <div className="app-continuation">
             {activeDeals.slice(0, 5).map(deal => (
-              <Link key={deal.id} href={`/deals/${deal.id}`} className="crm-continuation-card">
+              <Link key={deal.id} href={`/deals/${deal.id}`}>
                 <strong><ClampedText lines={1}>{deal.title}</ClampedText></strong>
-                <p><ClampedText lines={1}>{deal.companyName ?? 'Unknown company'} · {deal.stageName ?? 'No stage'}</ClampedText></p>
+                <span><ClampedText lines={1}>{deal.companyName ?? 'Unknown company'} · {deal.stageName ?? 'No stage'}</ClampedText></span>
               </Link>
             ))}
           </div>
         ) : <CrmEmpty title="No recent records" />}
-      </CrmPanel> : null}
+      </section>
     </CrmPage>
   )
+}
+
+function MetricCard({ label, value }: { label: string; value: string | number }) {
+  return <article className="app-metric-card"><span>{label}</span><strong>{value}</strong></article>
+}
+
+function CardHeader({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
+  return <header className="app-card-header"><div><span>{icon}</span><h2>{title}</h2></div>{action}</header>
+}
+
+function askHalvex(query: string) {
+  window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query } }))
 }

@@ -10,7 +10,6 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   Clock3,
-  FileText,
   MailPlus,
   NotebookPen,
   Plus,
@@ -93,37 +92,39 @@ export default function DealRecordPage() {
 
   return (
     <CrmPage wide>
-      <DealRecordHero
-        deal={deal}
-        context={context}
-        health={health}
-        onAddNote={() => setActiveTab('notes')}
-        onAddTask={() => setActiveTab('tasks')}
-      />
+      <div className="app-record-page">
+        <DealRecordHero
+          deal={deal}
+          context={context}
+          health={health}
+          onAddNote={() => setActiveTab('notes')}
+          onAddTask={() => setActiveTab('tasks')}
+        />
 
-      <div className="crm-record2-tabs" aria-label="Deal record sections">
-        {tabs.map(tab => (
-          <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => setActiveTab(tab.id)}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+        <div className="app-record-tabs" aria-label="Deal record sections">
+          {tabs.map(tab => (
+            <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => setActiveTab(tab.id)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      <div className="crm-record2-layout">
-        <main className="crm-record2-main">
-          {activeTab === 'overview' ? (
-            <OverviewTab context={context} deal={deal} stages={stages} health={health} onUpdate={updateDeal} onTab={setActiveTab} />
-          ) : null}
-          {activeTab === 'tasks' ? <TasksTab context={context} onChanged={mutate} /> : null}
-          {activeTab === 'notes' ? <NotesTab deal={deal} activities={context.latestActivities ?? []} onSaved={mutate} /> : null}
-          {activeTab === 'people' ? <PeopleTab context={context} onChanged={mutate} /> : null}
-          {activeTab === 'activity' ? <ActivityTab activities={context.latestActivities ?? []} completedTasks={context.completedTasks ?? []} /> : null}
-        </main>
+        <div className="app-record-layout">
+          <main className="app-record-main">
+            {activeTab === 'overview' ? (
+              <OverviewTab context={context} deal={deal} stages={stages} health={health} onUpdate={updateDeal} onTab={setActiveTab} />
+            ) : null}
+            {activeTab === 'tasks' ? <TasksTab context={context} onChanged={mutate} /> : null}
+            {activeTab === 'notes' ? <NotesTab deal={deal} activities={context.latestActivities ?? []} onSaved={mutate} /> : null}
+            {activeTab === 'people' ? <PeopleTab context={context} onChanged={mutate} /> : null}
+            {activeTab === 'activity' ? <ActivityTab activities={context.latestActivities ?? []} completedTasks={context.completedTasks ?? []} /> : null}
+          </main>
 
-        <aside className="crm-record2-side">
-          <RecordContextPanel context={context} deal={deal} health={health} onTab={setActiveTab} />
-          <DealAnalystPanel context={context} health={health} onChanged={mutate} onRefresh={refreshHealth} />
-        </aside>
+          <aside className="app-record-side">
+            <DealAnalystPanel context={context} health={health} onChanged={mutate} onRefresh={refreshHealth} />
+            <RecordContextPanel context={context} deal={deal} health={health} onTab={setActiveTab} />
+          </aside>
+        </div>
       </div>
     </CrmPage>
   )
@@ -132,19 +133,18 @@ export default function DealRecordPage() {
 function DealRecordHero({ deal, context, health, onAddNote, onAddTask }: { deal: any; context: any; health: ReturnType<typeof buildHealth>; onAddNote: () => void; onAddTask: () => void }) {
   const companyName = context.company?.name ?? deal.companyName ?? 'Unknown company'
   return (
-    <section className="crm-record2-hero">
-      <div className="crm-record2-hero-copy">
-        <small>Deal record</small>
+    <section className="app-record-hero">
+      <div className="app-record-hero-copy">
+        <small>Deal</small>
         <h1><ClampedText lines={2} title={deal.title}>{deal.title}</ClampedText></h1>
         <p>{companyName} · {deal.stageName ?? 'No stage'} · {deal.status ?? 'open'}</p>
         <div className="crm-record2-actions">
           <CrmButton tone="primary" onClick={onAddNote}><NotebookPen size={16} /> Add note</CrmButton>
           <CrmButton onClick={onAddTask}><CheckCircle2 size={16} /> Add task</CrmButton>
-          <CrmButton onClick={() => askHalvex(`Draft a concise follow-up for ${deal.title}`, deal.id)}><MailPlus size={16} /> Draft email</CrmButton>
           <CrmButton onClick={() => askHalvex(`Analyse ${deal.title}. Show risks, evidence, confidence, and the next best manual action.`, deal.id)}><Bot size={16} /> Analyse</CrmButton>
         </div>
       </div>
-      <div className="crm-record2-hero-facts">
+      <div className="app-record-facts">
         <Fact label="Value" value={money(deal.valueAmount)} empty={!deal.valueAmount} />
         <Fact label="Close date" value={deal.expectedCloseDate ? (shortDate(deal.expectedCloseDate) ?? 'Set close date') : 'Set close date'} empty={!deal.expectedCloseDate} />
         <Fact label="Probability" value={deal.probability ? `${deal.probability}%` : 'Not set'} empty={!deal.probability} />
@@ -743,13 +743,10 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
       </div>
 
       <div className="crm-analyst-actions">
-        <CrmButton tone="primary" onClick={() => runAnalysis('Deal analysis', `Analyse ${deal.title}. Include what changed, what is risky, what is missing, evidence, confidence, and recommended manual CRM updates.`)} disabled={Boolean(analysisLoading)}><Bot size={16} /> {analysisLoading === 'Deal analysis' ? 'Analysing...' : 'Analyse deal'}</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Next step', `Suggest the next step for ${deal.title}. Explain why and what evidence supports it.`)} disabled={Boolean(analysisLoading)}><CheckCircle2 size={16} /> Suggest next step</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Record summary', `Summarise the record for ${deal.title}: fields, notes, tasks, people, risks, and current next step.`)} disabled={Boolean(analysisLoading)}><FileText size={16} /> Summarise record</CrmButton>
-        <CrmButton onClick={() => runAnalysis('CRM extraction', `Extract CRM updates from the latest note on ${deal.title}. Suggest field changes, tasks, and notes without applying them.`)} disabled={Boolean(analysisLoading)}><NotebookPen size={16} /> Extract updates</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Follow-up draft', `Draft a concise follow-up for ${deal.title} based only on saved CRM context.`)} disabled={Boolean(analysisLoading)}><MailPlus size={16} /> Draft follow-up</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Buyer gaps', `Find missing buyer information for ${deal.title}: economic buyer, champion, decision process, urgency, and blockers.`)} disabled={Boolean(analysisLoading)}><UserRound size={16} /> Missing buyer info</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Risk explanation', `Explain the risk score for ${deal.title} using evidence and confidence.`)} disabled={Boolean(analysisLoading)}><RefreshCw size={16} /> Explain risk</CrmButton>
+        <CrmButton tone="primary" onClick={() => runAnalysis('Deal analysis', `Analyse ${deal.title}. Include what changed, what is risky, what is missing, evidence, confidence, and recommended manual CRM updates.`)} disabled={Boolean(analysisLoading)}><Bot size={16} /> {analysisLoading === 'Deal analysis' ? 'Analysing...' : 'Analyse'}</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Next step', `Suggest the next step for ${deal.title}. Explain why and what evidence supports it.`)} disabled={Boolean(analysisLoading)}><CheckCircle2 size={16} /> Next step</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Follow-up draft', `Draft a concise follow-up for ${deal.title} based only on saved CRM context.`)} disabled={Boolean(analysisLoading)}><MailPlus size={16} /> Follow-up</CrmButton>
+        <CrmButton onClick={() => runAnalysis('CRM extraction', `Extract CRM updates from the latest note on ${deal.title}. Suggest field changes, tasks, and notes without applying them.`)} disabled={Boolean(analysisLoading)}><NotebookPen size={16} /> Extract</CrmButton>
       </div>
 
       {analysisError ? <div className="crm-analyst-error">{analysisError}</div> : null}
@@ -877,7 +874,7 @@ function RecordContextPanel({ context, deal, health, onTab }: { context: any; de
   return (
     <CrmPanel className="crm-record-context">
       <div className="crm-record-context-head">
-        <h2>Record context</h2>
+        <h2>Context</h2>
         <CrmRiskBadge risk={health.risk} />
       </div>
       <div className="crm-record-context-row">

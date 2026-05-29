@@ -1,11 +1,11 @@
 'use client'
 
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { LayoutGrid, List, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { Bot, LayoutGrid, List, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
   CrmBadge,
@@ -16,14 +16,9 @@ import {
   DataTable,
   FilterBar,
   CrmPage,
-  CrmPanel,
   CrmRiskBadge,
-  CrmSectionHeader,
   CrmSegmentedFilters,
   CrmSkeleton,
-  CrmStat,
-  ObjectWorkspaceHeader,
-  ObjectStartState,
   SavedViewBar,
   ViewTabs,
   money,
@@ -57,7 +52,7 @@ export default function DealsPage() {
 function DealsContent() {
   const router = useRouter()
   const search = useSearchParams()
-  const view = search.get('view') ?? 'list'
+  const view = search.get('view') ?? 'pipeline'
   const [quickAddOpen, setQuickAddOpen] = useState(search.get('quick') === 'deal')
   const [query, setQuery] = useState('')
   const [risk, setRisk] = useState<'all' | 'high' | 'medium' | 'low'>('all')
@@ -95,7 +90,6 @@ function DealsContent() {
   const noNext = openDeals.filter((deal: any) => !deal.aiNextAction && !deal.nextStepDueAt).length
   const needsReview = openDeals.filter((deal: any) => deal.aiRiskLevel === 'high' || !deal.valueAmount || !deal.expectedCloseDate).length
   const showDealControls = allDeals.length > 0 || Boolean(query) || risk !== 'all' || stageFilter !== 'all' || statusFilter !== 'open'
-  const showRecordsPanel = !(quickAddOpen && !allDeals.length && !query)
 
   useEffect(() => {
     if (search.get('quick') === 'deal') setQuickAddOpen(true)
@@ -175,22 +169,32 @@ function DealsContent() {
 
   return (
     <CrmPage wide>
-      <ObjectWorkspaceHeader
-        object="Deals"
-        title="Deals"
-        actions={allDeals.length ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> New deal</CrmButton> : undefined}
-        stats={allDeals.length ? <>
-        <CrmStat label="Open deals" value={openDeals.length} />
-        <CrmStat label="Open value" value={money(openValue)} />
-        {noNext ? <CrmStat label="No next step" value={noNext} /> : null}
-        {needsReview ? <CrmStat label="Review" value={needsReview} /> : null}
-        </> : undefined}
-      />
+      <section className="app-page-head">
+        <div>
+          <span className="app-kicker">Pipeline</span>
+          <h1>Deals</h1>
+          <p>{openDeals.length} open · {money(openValue)} · {noNext} without next step</p>
+        </div>
+        <div className="app-page-actions">
+          <CrmButton onClick={() => askHalvex('Analyse the open pipeline. Show risks, stale records, buyer gaps, and suggested actions.')}>
+            <Bot size={16} /> Analyse
+          </CrmButton>
+          <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> New deal</CrmButton>
+        </div>
+      </section>
 
       {quickAddOpen ? <QuickAddDeal onCancel={() => setQuickAddOpen(false)} onCreated={async (id) => { await mutate(); router.push(`/deals/${id}`) }} /> : null}
 
-      {showRecordsPanel ? <CrmPanel className="crm-record-workbench">
-        <CrmSectionHeader
+      <section className="app-metric-grid">
+        <MetricCard label="Open deals" value={openDeals.length} />
+        <MetricCard label="Open value" value={money(openValue)} />
+        <MetricCard label="No next step" value={noNext} />
+        <MetricCard label="Needs review" value={needsReview} />
+      </section>
+
+      <section className="app-card app-pipeline-shell">
+        <CardHeader
+          icon={<LayoutGrid size={18} />}
           title="Records"
           action={<ViewTabs tabs={[
             { href: '/deals?view=list', label: 'List', active: view === 'list', icon: <List size={14} /> },
@@ -258,21 +262,24 @@ function DealsContent() {
 
         {isLoading ? <CrmSkeleton rows={8} /> : null}
         {!isLoading && !deals.length && query ? <CrmEmpty title="No matching deals" action={<CrmButton onClick={() => { setQuery(''); setRisk('all'); setStageFilter('all') }} tone="primary">Clear filters</CrmButton>} /> : null}
-        {!isLoading && !deals.length && !query && !quickAddOpen ? (
-          <ObjectStartState
-            label=""
-            title="No deals yet"
-            description=""
-            primaryAction={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={15} /> New deal</CrmButton>}
-            secondaryAction={<CrmButton href="/companies" tone="ghost">Companies</CrmButton>}
-            steps={[]}
-          />
-        ) : null}
+        {!isLoading && !deals.length && !query && !quickAddOpen ? <CrmEmpty title="No deals yet" action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={15} /> New deal</CrmButton>} /> : null}
         {!isLoading && deals.length > 0 && view === 'list' ? <ListView deals={deals} stages={stages} onMove={moveDeal} movingId={movingId} /> : null}
         {!isLoading && deals.length > 0 && view === 'pipeline' ? <PipelineView stages={stages} deals={deals} onMove={moveDeal} movingId={movingId} /> : null}
-      </CrmPanel> : null}
+      </section>
     </CrmPage>
   )
+}
+
+function MetricCard({ label, value }: { label: string; value: string | number }) {
+  return <article className="app-metric-card"><span>{label}</span><strong>{value}</strong></article>
+}
+
+function CardHeader({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
+  return <header className="app-card-header"><div><span>{icon}</span><h2>{title}</h2></div>{action}</header>
+}
+
+function askHalvex(query: string) {
+  window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query } }))
 }
 
 function SaveDealViewPanel({ onSave, onCancel, savedViews, onDelete, current }: {
@@ -370,8 +377,8 @@ function QuickAddDeal({ onCancel, onCreated }: { onCancel: () => void; onCreated
   }
 
   return (
-    <CrmPanel>
-      <CrmSectionHeader title="Add deal" />
+    <section className="app-card app-quick-add">
+      <CardHeader icon={<Plus size={18} />} title="New deal" />
       <form className="crm-form-grid" onSubmit={submit}>
         <label>Deal<input className="crm-input" value={title} onChange={event => setTitle(event.target.value)} placeholder="Website rebuild" required /></label>
         <label>Company<input className="crm-input" value={companyName} onChange={event => setCompanyName(event.target.value)} placeholder="Finch Studio" required /></label>
@@ -383,7 +390,7 @@ function QuickAddDeal({ onCancel, onCreated }: { onCancel: () => void; onCreated
           {error ? <CrmBadge tone="danger">{error}</CrmBadge> : null}
         </div>
       </form>
-    </CrmPanel>
+    </section>
   )
 }
 
@@ -410,7 +417,7 @@ function PipelineView({ stages, deals, onMove, movingId }: { stages: any[]; deal
                 <p>{stageDeals.length} deals · {money(value)}</p>
               </div>
               <div className="crm-stage-list">
-                {stageDeals.length ? stageDeals.map(deal => <PipelineDealCard key={deal.id} deal={deal} stages={stages} onMove={onMove} moving={movingId === deal.id} />) : <CrmEmpty title="No deals here">This stage is clear.</CrmEmpty>}
+                {stageDeals.length ? stageDeals.map(deal => <PipelineDealCard key={deal.id} deal={deal} stages={stages} onMove={onMove} moving={movingId === deal.id} />) : <CrmEmpty title="Empty" />}
               </div>
             </section>
           )

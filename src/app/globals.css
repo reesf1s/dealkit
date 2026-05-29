@@ -18927,3 +18927,930 @@ body {
   color: #fff !important;
   box-shadow: 0 12px 26px rgba(147,51,234,.18) !important;
 }
+
+/* Focused Application-skill rebuild: Home, Pipeline, Deal record */
+.app-page-head,
+.app-card,
+.app-record-hero {
+  border: 1px solid rgba(88,70,120,.12);
+  background: rgba(255,255,255,.82);
+  box-shadow: 0 16px 42px rgba(37,30,54,.08), inset 0 1px 0 rgba(255,255,255,.9);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.app-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 118px;
+  padding: 24px;
+  border-radius: 24px;
+}
+
+.app-kicker {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(147,51,234,.16);
+  border-radius: 999px;
+  background: rgba(250,245,255,.82);
+  color: #7e22ce;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.app-page-head h1 {
+  margin: 10px 0 6px;
+  color: #09090b;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 820;
+}
+
+.app-page-head p {
+  margin: 0;
+  color: rgba(9,9,11,.56);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.app-page-actions,
+.app-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.app-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.app-metric-card {
+  min-height: 112px;
+  padding: 20px;
+  border: 1px solid rgba(88,70,120,.11);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 85% 0%, rgba(147,51,234,.10), transparent 38%),
+    rgba(255,255,255,.78);
+  box-shadow: 0 12px 32px rgba(37,30,54,.06), inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.app-metric-card span {
+  display: block;
+  color: rgba(9,9,11,.52);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.app-metric-card strong {
+  display: block;
+  margin-top: 18px;
+  color: #09090b;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.app-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, .8fr);
+  gap: 16px;
+}
+
+.app-card {
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+.app-card-header {
+  min-height: 70px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(88,70,120,.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-card-header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-card-header > div > span,
+.app-row-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(88,70,120,.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  color: #9333ea;
+}
+
+.app-card-header h2 {
+  margin: 0;
+  color: #09090b;
+  font-size: 16px;
+  line-height: 1.1;
+  font-weight: 780;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.app-list {
+  display: grid;
+}
+
+.app-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 74px;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(88,70,120,.08);
+}
+
+.app-row:last-child {
+  border-bottom: 0;
+}
+
+.app-row strong,
+.app-continuation strong {
+  color: #09090b;
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.app-row p,
+.app-continuation span {
+  margin: 4px 0 0;
+  color: rgba(9,9,11,.52);
+  font-size: 13px;
+}
+
+.app-ai-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+
+.app-ai-card button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  margin: 0 16px;
+  padding: 0 14px;
+  border: 1px solid rgba(147,51,234,.14);
+  border-radius: 14px;
+  background: rgba(255,255,255,.72);
+  color: #6d28d9;
+  font-size: 13px;
+  font-weight: 740;
+  cursor: pointer;
+}
+
+.app-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.app-continuation {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.app-continuation a {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(88,70,120,.1);
+  border-radius: 16px;
+  background: rgba(255,255,255,.66);
+  text-decoration: none;
+}
+
+.app-pipeline-shell .crm-saved-view-bar,
+.app-pipeline-shell .crm-filter-bar {
+  margin: 0;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(88,70,120,.08);
+  border-bottom: 0;
+  background: transparent;
+}
+
+.app-pipeline-shell .crm-empty {
+  margin: 16px;
+  min-height: 132px;
+}
+
+.app-pipeline-shell .crm-table-wrap {
+  margin: 0;
+  border-width: 1px 0 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.app-pipeline-shell .crm-pipeline-frame {
+  padding: 16px;
+  background: transparent;
+}
+
+.app-pipeline-shell .crm-pipeline {
+  gap: 12px;
+}
+
+.app-pipeline-shell .crm-stage {
+  border-radius: 18px !important;
+  background: rgba(255,255,255,.66) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.82) !important;
+}
+
+.app-pipeline-shell .crm-stage-header {
+  padding: 14px 14px 10px !important;
+}
+
+.app-record-page {
+  display: grid;
+  gap: 16px;
+}
+
+.app-record-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, .8fr);
+  align-items: stretch;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 24px;
+}
+
+.app-record-hero-copy small {
+  color: #7e22ce;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.app-record-hero-copy h1 {
+  margin: 10px 0 8px;
+  color: #09090b;
+  font-size: 32px;
+  line-height: 1.08;
+  font-weight: 820;
+}
+
+.app-record-hero-copy p {
+  margin: 0 0 18px;
+  color: rgba(9,9,11,.56);
+  font-size: 14px;
+}
+
+.app-record-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.app-record-facts .crm-record2-fact {
+  min-height: 86px;
+  border: 1px solid rgba(88,70,120,.1) !important;
+  border-radius: 18px !important;
+  background: rgba(255,255,255,.68) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85) !important;
+}
+
+.app-record-tabs {
+  display: flex;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 6px;
+  border: 1px solid rgba(88,70,120,.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,.78);
+  box-shadow: 0 10px 28px rgba(37,30,54,.06), inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.app-record-tabs button {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(9,9,11,.58);
+  font-size: 13px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.app-record-tabs button.active {
+  background: linear-gradient(135deg, #9333ea, #a855f7);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(147,51,234,.2);
+}
+
+.app-record-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.app-record-main,
+.app-record-side {
+  display: grid;
+  gap: 16px;
+}
+
+.app-record-page .crm-record2-card,
+.app-record-page .crm-record2-next,
+.app-record-page .crm-record-context,
+.app-record-page .crm-analyst-panel,
+.app-record-page .crm-record2-mini-card {
+  border: 1px solid rgba(88,70,120,.12) !important;
+  border-radius: 22px !important;
+  background: rgba(255,255,255,.82) !important;
+  box-shadow: 0 14px 36px rgba(37,30,54,.07), inset 0 1px 0 rgba(255,255,255,.9) !important;
+  color: #09090b !important;
+}
+
+@media (max-width: 1100px) {
+  .app-metric-grid,
+  .app-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-dashboard-grid,
+  .app-record-layout,
+  .app-record-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .app-continuation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .app-page-head,
+  .app-row,
+  .app-card-header {
+    align-items: stretch;
+  }
+
+  .app-page-head,
+  .app-card-header {
+    flex-direction: column;
+  }
+
+  .app-page-actions,
+  .app-row-actions {
+    justify-content: flex-start;
+  }
+
+  .app-metric-grid,
+  .app-card-grid,
+  .app-continuation,
+  .app-record-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .app-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .app-row-actions {
+    grid-column: 2;
+  }
+}
+
+/* Three-page product pass: light Application system with Halvex brand image */
+.crm-content {
+  width: min(1480px, calc(100% - 32px)) !important;
+  max-width: 1480px !important;
+  margin: 16px auto 0 !important;
+  padding: 0 0 56px !important;
+}
+
+.crm-page.wide {
+  width: 100% !important;
+  max-width: none !important;
+  gap: 16px !important;
+}
+
+.app-page-head {
+  position: relative !important;
+  min-height: 188px !important;
+  padding: 30px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255,255,255,.54) !important;
+  border-radius: 26px !important;
+  background:
+    linear-gradient(90deg, rgba(13,18,16,.74), rgba(21,28,24,.44) 52%, rgba(255,255,255,.1)),
+    url('/images/halvex-mountain-bg.jpg') center 46% / cover no-repeat !important;
+  box-shadow: 0 24px 70px rgba(24,18,37,.16), inset 0 1px 0 rgba(255,255,255,.34) !important;
+}
+
+.app-page-head::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 55%, rgba(255,255,255,.18) 55% 55.08%, transparent 55.08%),
+    radial-gradient(circle at 84% 20%, rgba(255,255,255,.16), transparent 22%);
+}
+
+.app-page-head > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-page-head > div:first-child {
+  max-width: 760px;
+}
+
+.app-page-head h1 {
+  color: #fff !important;
+  font-size: clamp(32px, 4vw, 56px) !important;
+  line-height: .94 !important;
+  font-weight: 850 !important;
+  text-shadow: 0 18px 44px rgba(0,0,0,.2) !important;
+}
+
+.app-page-head p {
+  max-width: 680px;
+  color: rgba(255,255,255,.78) !important;
+  font-size: 14px !important;
+  font-weight: 520 !important;
+}
+
+.app-kicker {
+  height: 26px !important;
+  border-color: rgba(255,255,255,.24) !important;
+  background: rgba(255,255,255,.13) !important;
+  color: rgba(255,255,255,.82) !important;
+  backdrop-filter: blur(10px);
+}
+
+.app-page-actions {
+  flex-wrap: nowrap !important;
+}
+
+.app-page-head .crm-button {
+  height: 42px !important;
+  border-color: rgba(255,255,255,.28) !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25) !important;
+  backdrop-filter: blur(12px);
+}
+
+.app-page-head .crm-button.primary {
+  border-color: rgba(255,255,255,.42) !important;
+  background: linear-gradient(135deg, #9333ea, #7e22ce) !important;
+  box-shadow: 0 16px 34px rgba(147,51,234,.28), inset 0 1px 0 rgba(255,255,255,.28) !important;
+}
+
+.app-metric-grid {
+  gap: 12px !important;
+}
+
+.app-metric-card {
+  min-height: 104px !important;
+  border-radius: 20px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.76)),
+    radial-gradient(circle at 92% 0%, rgba(147,51,234,.12), transparent 36%) !important;
+}
+
+.app-metric-card strong {
+  margin-top: 16px !important;
+  font-size: clamp(24px, 2.5vw, 32px) !important;
+}
+
+.app-card {
+  border-radius: 22px !important;
+  background: rgba(255,255,255,.86) !important;
+  box-shadow: 0 18px 45px rgba(28,22,42,.08), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+.app-card-header {
+  min-height: 64px !important;
+  padding: 16px 18px !important;
+}
+
+.app-card-header > div > span,
+.app-row-icon {
+  width: 32px !important;
+  height: 32px !important;
+  color: #9333ea !important;
+}
+
+.app-row {
+  min-height: 68px !important;
+  padding: 12px 18px !important;
+}
+
+.app-row p,
+.app-continuation span,
+.crm-empty p {
+  color: rgba(9,9,11,.5) !important;
+}
+
+.app-ai-card button {
+  position: relative;
+  justify-content: flex-start !important;
+  gap: 10px;
+  height: 46px !important;
+  margin: 0 16px !important;
+  border-radius: 14px !important;
+  background: rgba(255,255,255,.82) !important;
+}
+
+.app-ai-card button::after {
+  content: ">";
+  margin-left: auto;
+  color: rgba(147,51,234,.6);
+}
+
+.app-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.app-continuation {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+}
+
+.app-quick-add {
+  padding-bottom: 18px;
+}
+
+.app-quick-add .crm-form-grid {
+  padding: 0 18px 18px !important;
+}
+
+.app-pipeline-shell .crm-saved-view-bar,
+.app-pipeline-shell .crm-filter-bar {
+  padding: 12px 16px !important;
+}
+
+.crm-view-tabs,
+.app-pipeline-shell .crm-view-tabs {
+  display: inline-flex !important;
+  flex-wrap: nowrap !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  height: 38px !important;
+  padding: 4px !important;
+  border-radius: 999px !important;
+  background: rgba(244,241,248,.76) !important;
+}
+
+.crm-view-tabs a,
+.crm-view-tabs button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  height: 30px !important;
+  min-width: 0 !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+
+.crm-view-tabs a.active,
+.crm-view-tabs button.active {
+  background: #fff !important;
+  color: #7e22ce !important;
+  box-shadow: 0 7px 18px rgba(147,51,234,.12) !important;
+}
+
+.crm-saved-view-bar {
+  gap: 10px !important;
+}
+
+.crm-saved-views {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+}
+
+.crm-saved-view,
+.crm-saved-view-save,
+.crm-filter-chips button,
+.crm-person-pill,
+.crm-priority-pill,
+.crm-badge {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 30px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+
+.crm-saved-view {
+  padding: 0 11px !important;
+  border-radius: 999px !important;
+}
+
+.crm-saved-view small {
+  min-width: 18px !important;
+  height: 18px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+}
+
+.crm-filter-bar {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+}
+
+.crm-filter-bar .crm-search-button {
+  flex: 1 1 300px !important;
+  min-width: 240px !important;
+}
+
+.crm-filter-bar .crm-select {
+  width: auto !important;
+  min-width: 142px !important;
+}
+
+.crm-filter-chips {
+  display: inline-flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+.app-pipeline-shell .crm-pipeline {
+  grid-auto-columns: minmax(280px, 1fr) !important;
+}
+
+.app-pipeline-shell .crm-stage {
+  border: 1px solid rgba(88,70,120,.1) !important;
+  border-radius: 18px !important;
+  background: rgba(250,249,252,.78) !important;
+}
+
+.app-pipeline-shell .crm-stage-header {
+  min-height: 62px !important;
+}
+
+.app-pipeline-shell .crm-stage-header h3,
+.app-pipeline-shell .crm-stage-header p {
+  margin: 0 !important;
+}
+
+.crm-pipeline-card {
+  border-radius: 16px !important;
+  background: rgba(255,255,255,.94) !important;
+  box-shadow: 0 12px 28px rgba(28,22,42,.06), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+.crm-card-next span {
+  display: none !important;
+}
+
+.crm-pipeline-card-actions {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+}
+
+.crm-pipeline-card-actions .crm-select {
+  min-width: 0 !important;
+}
+
+.app-record-page {
+  gap: 16px !important;
+}
+
+.app-record-hero {
+  position: relative !important;
+  min-height: 230px !important;
+  padding: 28px !important;
+  overflow: hidden !important;
+  border-color: rgba(255,255,255,.54) !important;
+  background:
+    linear-gradient(90deg, rgba(13,18,16,.76), rgba(21,28,24,.48) 52%, rgba(255,255,255,.11)),
+    url('/images/halvex-mountain-bg.jpg') center 46% / cover no-repeat !important;
+}
+
+.app-record-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 84% 18%, rgba(255,255,255,.16), transparent 24%);
+}
+
+.app-record-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-record-hero-copy small,
+.app-record-hero-copy h1,
+.app-record-hero-copy p {
+  color: #fff !important;
+}
+
+.app-record-hero-copy small {
+  display: inline-flex !important;
+  width: fit-content !important;
+  height: 26px !important;
+  align-items: center !important;
+  padding: 0 10px !important;
+  border: 1px solid rgba(255,255,255,.24) !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.13) !important;
+  color: rgba(255,255,255,.82) !important;
+  backdrop-filter: blur(10px);
+}
+
+.app-record-hero-copy h1 {
+  font-size: clamp(30px, 4vw, 52px) !important;
+  line-height: .96 !important;
+}
+
+.app-record-hero-copy p {
+  color: rgba(255,255,255,.78) !important;
+}
+
+.app-record-hero .crm-button {
+  height: 40px !important;
+  border-color: rgba(255,255,255,.28) !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #fff !important;
+  backdrop-filter: blur(12px);
+}
+
+.app-record-hero .crm-button.primary {
+  background: linear-gradient(135deg, #9333ea, #7e22ce) !important;
+}
+
+.app-record-facts .crm-record2-fact {
+  min-height: 88px !important;
+  background: rgba(255,255,255,.74) !important;
+}
+
+.app-record-tabs {
+  height: 46px !important;
+  padding: 5px !important;
+  border-radius: 999px !important;
+}
+
+.app-record-tabs button {
+  height: 34px !important;
+}
+
+.app-record-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 390px) !important;
+}
+
+.app-record-page .crm-record2-card,
+.app-record-page .crm-record2-next,
+.app-record-page .crm-record-context,
+.app-record-page .crm-analyst-panel,
+.app-record-page .crm-record2-mini-card {
+  border-radius: 20px !important;
+  background: rgba(255,255,255,.9) !important;
+}
+
+.crm-record2-card-head,
+.crm-record2-health-head,
+.crm-record-context-head,
+.crm-analyst-head {
+  min-height: 60px !important;
+  padding-bottom: 14px !important;
+  border-bottom: 1px solid rgba(88,70,120,.08) !important;
+}
+
+.crm-record2-card-head h2,
+.crm-record-context-head h2,
+.crm-analyst-head h2 {
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+}
+
+.app-card-header h2,
+.crm-record2-card-head h2,
+.crm-record-context-head h2,
+.crm-analyst-head h2,
+.crm-stage-header h3 {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.crm-record2-card-head p,
+.crm-analyst-head span {
+  display: none !important;
+}
+
+.crm-analyst-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.crm-analyst-actions .crm-button,
+.crm-analyst-insight-actions .crm-button,
+.crm-inline-analysis-actions .crm-button {
+  min-width: 0 !important;
+  height: 38px !important;
+  padding: 0 11px !important;
+  white-space: nowrap !important;
+}
+
+.crm-analyst-score-grid {
+  gap: 8px !important;
+}
+
+.crm-analyst-insight,
+.crm-inline-analysis {
+  border-radius: 16px !important;
+  background: rgba(250,249,252,.82) !important;
+}
+
+.crm-analyst-insight p,
+.crm-inline-analysis p,
+.crm-record-context-next p {
+  overflow: visible !important;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+}
+
+@media (max-width: 980px) {
+  .app-page-head,
+  .app-record-hero,
+  .app-record-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-page-actions {
+    justify-content: flex-start !important;
+  }
+
+  .app-record-layout {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .crm-content {
+    width: min(100% - 20px, 1480px) !important;
+    margin-top: 10px !important;
+    padding-bottom: 92px !important;
+  }
+
+  .app-page-head,
+  .app-record-hero {
+    min-height: 0 !important;
+    padding: 22px !important;
+  }
+
+  .app-page-actions,
+  .crm-record2-actions {
+    flex-wrap: wrap !important;
+  }
+
+  .app-metric-grid,
+  .app-dashboard-grid,
+  .app-record-facts,
+  .crm-analyst-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
