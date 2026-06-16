@@ -21556,3 +21556,517 @@ body {
     width: calc(100% - 48px);
   }
 }
+
+/* Deal detail polish */
+.app-record-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px) !important;
+  gap: 14px !important;
+}
+
+.app-record-main,
+.app-record-side {
+  gap: 14px !important;
+}
+
+.app-record-main > .deal-assistant-panel {
+  overflow: hidden !important;
+  border-color: rgba(68,60,82,.1) !important;
+  border-radius: 20px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,246,248,.94)),
+    radial-gradient(circle at 100% 0%, rgba(147,51,234,.08), transparent 36%) !important;
+  box-shadow: 0 18px 48px rgba(31,24,46,.08), inset 0 1px 0 rgba(255,255,255,.96) !important;
+}
+
+.app-record-main > .deal-assistant-panel .crm-analyst-head {
+  min-height: 54px !important;
+  padding: 13px 16px !important;
+}
+
+.app-record-main > .deal-assistant-panel .crm-analyst-head button {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 11px !important;
+}
+
+.app-record-main > .deal-assistant-panel > .deal-assistant-shell,
+.app-record-main > .deal-assistant-panel .deal-assistant-shell {
+  position: static !important;
+  display: grid !important;
+  gap: 12px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 14px !important;
+}
+
+.deal-assistant-readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.deal-assistant-readout div {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(88,70,120,.09);
+  border-radius: 14px;
+  background: rgba(255,255,255,.76);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
+}
+
+.deal-assistant-readout span,
+.crm-record-context-status span {
+  color: rgba(9,9,11,.46);
+  font-size: 11px;
+  font-weight: 820;
+  letter-spacing: .03em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.deal-assistant-readout strong,
+.crm-record-context-status strong {
+  overflow: hidden;
+  color: #09090b;
+  font-size: 13px;
+  font-weight: 780;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-thread {
+  display: grid !important;
+  align-content: start !important;
+  gap: 12px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-message.user {
+  justify-self: stretch !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 12px 14px !important;
+  border: 1px solid rgba(88,70,120,.08) !important;
+  border-radius: 14px !important;
+  background: rgba(239,238,242,.82) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.74) !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-message.user p {
+  color: rgba(9,9,11,.82) !important;
+  font-size: 15px !important;
+  font-weight: 620 !important;
+  line-height: 1.42 !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-message.assistant {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  border: 1px solid rgba(88,70,120,.1) !important;
+  border-radius: 18px !important;
+  background: rgba(255,255,255,.9) !important;
+  box-shadow: 0 12px 28px rgba(31,24,46,.05), inset 0 1px 0 rgba(255,255,255,.94) !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-brand {
+  gap: 7px !important;
+  color: rgba(9,9,11,.48) !important;
+  font-size: 12px !important;
+  font-weight: 780 !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-message.assistant h3 {
+  max-width: none !important;
+  color: #09090b !important;
+  font-size: 20px !important;
+  font-weight: 760 !important;
+  line-height: 1.22 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-message.assistant > p {
+  max-width: none !important;
+  color: rgba(9,9,11,.62) !important;
+  font-size: 14px !important;
+  font-weight: 520 !important;
+  line-height: 1.52 !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-evidence {
+  max-width: none !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin-top: 0 !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-evidence section {
+  min-width: 0 !important;
+  padding: 12px !important;
+  border: 1px solid rgba(88,70,120,.09) !important;
+  border-radius: 14px !important;
+  background: rgba(250,249,252,.84) !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-evidence span {
+  color: rgba(9,9,11,.46) !important;
+  font-size: 11px !important;
+  font-weight: 820 !important;
+  letter-spacing: .03em !important;
+  text-transform: uppercase !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-evidence p {
+  margin-top: 6px !important;
+  color: rgba(9,9,11,.66) !important;
+  font-size: 12px !important;
+  line-height: 1.44 !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-questions {
+  gap: 6px !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-questions span {
+  min-height: 30px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-action-card,
+.app-record-main > .deal-assistant-panel .crm-inline-analysis {
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 14px !important;
+  border-radius: 16px !important;
+  background: rgba(255,255,255,.92) !important;
+  box-shadow: 0 10px 26px rgba(31,24,46,.05), inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-action-card h3 {
+  font-size: 18px !important;
+  line-height: 1.22 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-action-card p,
+.app-record-main > .deal-assistant-panel .deal-assistant-action-card dd {
+  color: rgba(9,9,11,.62) !important;
+  font-size: 13px !important;
+  line-height: 1.46 !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-action-card dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-action-card dl div {
+  grid-template-columns: 1fr !important;
+  gap: 5px !important;
+  padding: 10px !important;
+  border: 1px solid rgba(88,70,120,.08) !important;
+  border-radius: 13px !important;
+  background: rgba(250,249,252,.7) !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-card-actions .crm-button,
+.app-record-main > .deal-assistant-panel .deal-assistant-prompts .crm-button,
+.app-record-main > .deal-assistant-panel .crm-inline-analysis-actions .crm-button {
+  min-height: 34px !important;
+  padding: 0 11px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-prompts {
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 7px !important;
+}
+
+.app-record-main > .deal-assistant-panel .deal-assistant-composer {
+  position: static !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 8px !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+
+.app-record-side .crm-record-context {
+  top: 92px !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border-radius: 20px !important;
+}
+
+.crm-record-context > :not(.crm-record-context-head) {
+  margin: 0 !important;
+}
+
+.app-record-side .crm-record-context .crm-record-context-head {
+  min-height: 54px !important;
+  padding: 13px 14px !important;
+}
+
+.crm-record-context-status {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 14px 6px;
+}
+
+.crm-record-context-status div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid rgba(88,70,120,.09);
+  border-radius: 13px;
+  background: rgba(250,249,252,.74);
+}
+
+.app-record-side .crm-record-context .crm-record-context-row {
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 9px 14px !important;
+}
+
+.app-record-side .crm-record-context .crm-record-context-row > span {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 10px !important;
+}
+
+.crm-record-context-people {
+  display: grid;
+  gap: 7px;
+  padding: 4px 14px 12px;
+}
+
+.crm-record-context-people .crm-linked-chip,
+.crm-record-context-people button {
+  min-width: 0;
+  min-height: 32px !important;
+  justify-content: flex-start !important;
+  padding: 0 10px !important;
+  border: 1px solid rgba(88,70,120,.09) !important;
+  border-radius: 12px !important;
+  background: rgba(247,246,242,.82) !important;
+  color: rgba(9,9,11,.78) !important;
+  font-size: 13px !important;
+  font-weight: 720 !important;
+  line-height: 1.2 !important;
+  text-align: left;
+}
+
+.crm-record-context-people .crm-linked-chip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-record-context-people button {
+  cursor: pointer;
+}
+
+.app-record-side .crm-record-context .crm-record-context-grid {
+  gap: 8px !important;
+  padding: 0 14px 12px !important;
+}
+
+.app-record-side .crm-record-context .crm-record-context-grid div {
+  min-height: 58px !important;
+  padding: 10px !important;
+  border-radius: 13px !important;
+}
+
+.app-record-side .crm-record-context .crm-record-context-next {
+  margin: 0 14px 12px !important;
+  padding: 12px !important;
+  border-radius: 14px !important;
+}
+
+.app-record-side .crm-record-context .crm-record-context-next p {
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 5 !important;
+  color: rgba(9,9,11,.6) !important;
+  font-size: 12px !important;
+  line-height: 1.44 !important;
+}
+
+.app-record-side .crm-record-context .crm-record-context-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 0 14px 14px !important;
+}
+
+.app-record-side .crm-record-context .crm-record-context-actions .crm-button {
+  width: 100% !important;
+  min-height: 34px !important;
+  border-radius: 12px !important;
+}
+
+@media (max-width: 1180px) {
+  .app-record-main > .deal-assistant-panel .deal-assistant-evidence,
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card dl {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .app-record-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-record-side .crm-record-context {
+    position: relative !important;
+    top: auto !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body,
+  .crm-shell,
+  .crm-main {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .crm-content,
+  .crm-page.wide,
+  .app-record-page,
+  .app-record-layout {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .app-record-hero,
+  .app-record-facts,
+  .app-record-tabs,
+  .app-record-main,
+  .app-record-side,
+  .deal-assistant-panel,
+  .deal-assistant-shell,
+  .deal-assistant-thread,
+  .deal-assistant-message,
+  .deal-assistant-action-card,
+  .crm-inline-analysis,
+  .crm-record-context {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .app-record-hero {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .app-record-tabs {
+    overflow-x: auto !important;
+  }
+
+  .app-record-hero-copy h1 {
+    max-width: 100% !important;
+    font-size: 22px !important;
+    line-height: 1.02 !important;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
+  }
+
+  .app-record-hero-copy p {
+    max-width: 100% !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
+  }
+
+  .app-record-hero-copy .crm-clamped {
+    -webkit-line-clamp: 3 !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card header,
+  .app-record-main > .deal-assistant-panel .crm-inline-analysis header {
+    flex-wrap: wrap !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card header .crm-badge,
+  .app-record-main > .deal-assistant-panel .crm-inline-analysis header .crm-badge {
+    max-width: 100% !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-message.user,
+  .app-record-main > .deal-assistant-panel .deal-assistant-message.assistant,
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card,
+  .app-record-main > .deal-assistant-panel .crm-inline-analysis {
+    width: calc(100vw - 56px) !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card header .crm-badge {
+    display: none !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-message.user p {
+    font-size: 12px !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-message.assistant h3,
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card h3 {
+    font-size: 16px !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-message.assistant > p,
+  .app-record-main > .deal-assistant-panel .deal-assistant-evidence p,
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card p,
+  .app-record-main > .deal-assistant-panel .deal-assistant-action-card dd {
+    font-size: 11px !important;
+  }
+
+  .deal-assistant-readout,
+  .crm-record-context-status,
+  .app-record-side .crm-record-context .crm-record-context-grid,
+  .app-record-side .crm-record-context .crm-record-context-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-prompts .crm-button {
+    flex: 1 1 calc(50% - 7px) !important;
+  }
+
+  .app-record-main > .deal-assistant-panel .deal-assistant-composer {
+    grid-template-columns: 1fr !important;
+  }
+}

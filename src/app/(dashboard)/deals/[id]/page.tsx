@@ -144,7 +144,7 @@ function DealRecordHero({ deal, context, health, onAddNote, onAddTask }: { deal:
     <section className="app-record-hero">
       <div className="app-record-hero-copy">
         <small>Deal</small>
-        <h1><ClampedText lines={2} title={deal.title}>{deal.title}</ClampedText></h1>
+        <h1><ClampedText lines={3} title={deal.title}>{deal.title}</ClampedText></h1>
         <p>{summary}</p>
         <div className="crm-record2-actions">
           <CrmButton tone="primary" onClick={onAddNote}><NotebookPen size={16} /> Add note</CrmButton>
@@ -627,6 +627,13 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
   const activeInsights = insights.filter(insight => !dismissed.has(insight.id))
   const primaryInsight = activeInsights[0]
   const brief = buildAnalystBrief(context, health)
+  const daysIdle = daysSince(deal.lastActivityAt)
+  const analystReadout = [
+    { label: 'Risk', value: sentenceLabel(String(health.risk || 'unknown')) },
+    { label: 'Activity', value: daysIdle != null ? `${daysIdle}d idle` : 'No activity' },
+    { label: 'Confidence', value: health.confidence ? `${health.confidence}%` : 'Needs context' },
+    { label: 'Close', value: shortDate(deal.expectedCloseDate) ?? 'Missing' },
+  ]
   const latestEvidence = context?.intelligence?.latestEvidence?.text
     || context?.latestActivities?.[0]?.summary
     || context?.latestActivities?.[0]?.body
@@ -754,13 +761,22 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
     <CrmPanel className="crm-analyst-panel deal-assistant-panel">
       <div className="crm-analyst-head">
         <div>
-          <span>Embedded analyst</span>
+          <span>Deal analyst</span>
           <h2>Ask Halvex about this deal</h2>
         </div>
         <button type="button" onClick={onRefresh} aria-label="Refresh deal analysis"><RefreshCw size={16} /></button>
       </div>
 
       <div className="deal-assistant-shell">
+        <div className="deal-assistant-readout" aria-label="Deal analyst summary">
+          {analystReadout.map(item => (
+            <div key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+        </div>
+
         <div className="deal-assistant-thread" aria-live="polite">
           <div className="deal-assistant-message user">
             <p>What matters on {deal.title} right now?</p>
@@ -916,11 +932,16 @@ function RecordContextPanel({ context, deal, health, onTab }: { context: any; de
   const contacts = context.contacts ?? []
   const openTasks = splitTasks(context.openTasks ?? []).active
   const lastActivity = context.latestActivities?.[0]
+  const extraContacts = Math.max(contacts.length - 4, 0)
   return (
     <CrmPanel className="crm-record-context">
       <div className="crm-record-context-head">
         <h2>Context</h2>
         <CrmRiskBadge risk={health.risk} />
+      </div>
+      <div className="crm-record-context-status">
+        <div><span>Stage</span><strong>{deal.stageName ?? 'No stage'}</strong></div>
+        <div><span>Probability</span><strong>{deal.probability ? `${deal.probability}%` : 'Not set'}</strong></div>
       </div>
       <div className="crm-record-context-row">
         <span><BriefcaseBusiness size={16} /></span>
@@ -936,9 +957,14 @@ function RecordContextPanel({ context, deal, health, onTab }: { context: any; de
           <strong>{contacts.length ? `${contacts.length} linked` : 'None linked'}</strong>
         </div>
       </div>
-      {contacts.slice(0, 4).map((contact: any) => (
-        <LinkedRecordChip key={contact.id} href={`/people/${contact.id}`}><UserRound size={14} /> {contact.fullName}</LinkedRecordChip>
-      ))}
+      {contacts.length ? (
+        <div className="crm-record-context-people">
+          {contacts.slice(0, 4).map((contact: any) => (
+            <LinkedRecordChip key={contact.id} href={`/people/${contact.id}`}><UserRound size={14} /> {contact.fullName}</LinkedRecordChip>
+          ))}
+          {extraContacts ? <button type="button" onClick={() => onTab('people')}>+{extraContacts} more</button> : null}
+        </div>
+      ) : null}
       <div className="crm-record-context-grid">
         <div><span>Value</span><strong>{money(deal.valueAmount)}</strong></div>
         <div><span>Close</span><strong>{shortDate(deal.expectedCloseDate) ?? 'Missing'}</strong></div>
