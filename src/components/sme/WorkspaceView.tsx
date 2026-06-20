@@ -1648,6 +1648,15 @@ function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
   const meetingMessages = workspace.messages.meetings
   const riskSignals = meetingActivities.filter(activity => signalTone(`${activity.title} ${activity.body}`) === 'border-red-400/25 bg-red-400/10 text-red-100')
   const decisionSignals = meetingActivities.filter(activity => `${activity.title} ${activity.body}`.toLowerCase().includes('decision'))
+  const objectionSignals = meetingActivities.filter(activity => `${activity.title} ${activity.body}`.toLowerCase().match(/objection|concern|security|legal|competitor|gong|price|budget/))
+  const evidenceLeads = meetingActivities
+    .map(activity => activityLead(workspace, activity))
+    .filter((lead): lead is CrmLeadDto => Boolean(lead))
+  const evidenceValue = evidenceLeads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+  const weakEvidenceDeals = workspace.leads
+    .filter(lead => !meetingActivities.some(activity => activity.companyName === lead.companyName || activity.personName === lead.primaryPersonName))
+    .sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0))
+    .slice(0, 4)
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -1658,6 +1667,60 @@ function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
           <StatCard label="Risk signals" value={`${riskSignals.length}`} detail="Competitor, budget, legal, or security mentions." icon={ShieldAlert} />
           <StatCard label="Decision signals" value={`${decisionSignals.length}`} detail="Owner, deadline, or close-window signals." icon={CheckCircle2} />
         </div>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Call evidence cockpit</CardTitle>
+                  <CardDescription>How much pipeline is backed by call evidence, and where the story is still thin.</CardDescription>
+                </div>
+                <Button asChild className="rounded-full bg-white text-black hover:bg-zinc-200">
+                  <Link href="/call-review">
+                    <PhoneCall className="size-4" />
+                    Review transcript
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-3">
+              <div className={cn(pillInsetClass, 'p-4')}>
+                <p className="text-xs text-zinc-500">Evidence-backed value</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{money(evidenceValue)}</p>
+                <p className="mt-3 text-xs leading-5 text-zinc-500">{new Set(evidenceLeads.map(lead => lead.id)).size} deals have call context.</p>
+              </div>
+              <div className={cn(pillInsetClass, 'p-4')}>
+                <p className="text-xs text-zinc-500">Objection load</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{objectionSignals.length}</p>
+                <p className="mt-3 text-xs leading-5 text-zinc-500">Security, legal, price, competitor, or budget pressure found in notes.</p>
+              </div>
+              <div className={cn(pillInsetClass, 'p-4')}>
+                <p className="text-xs text-zinc-500">Coverage gaps</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{weakEvidenceDeals.length}</p>
+                <p className="mt-3 text-xs leading-5 text-zinc-500">High-value deals without meeting evidence in this workspace.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Evidence gaps</CardTitle>
+              <CardDescription>Deals that need a call note, transcript, or decision record.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2">
+              {weakEvidenceDeals.map(lead => (
+                <button key={lead.id} type="button" onClick={() => actions.selectLead(lead.id)} className="grid gap-2 rounded-[18px] border border-white/10 bg-black/20 p-3 text-left transition hover:bg-white/[0.06]">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-sm font-medium text-white">{lead.companyName}</p>
+                    <span className="text-xs text-zinc-400">{money(Number(lead.valueAmount ?? 0))}</span>
+                  </div>
+                  <p className="truncate text-xs text-zinc-500">{lead.stageName} · {lead.nextStep}</p>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
 
         <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
           <CardHeader>
