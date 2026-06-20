@@ -1623,23 +1623,58 @@ function AccountsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
 
 function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const [query, setQuery] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [workMode, setWorkMode] = useState<'focus' | 'today' | 'risk' | 'all'>('focus')
   const [leadId, setLeadId] = useState(workspace.leads[0]?.id ?? '')
+  const [selectedTaskId, setSelectedTaskId] = useState(workspace.tasks[0]?.id ?? '')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [dueAt, setDueAt] = useState(dateInputValue(new Date(Date.now() + 86_400_000)))
   const [busy, setBusy] = useState(false)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const leadByCompany = new Map(workspace.leads.map(lead => [lead.companyName, lead]))
-  const sortedTasks = [...workspace.tasks].sort((a, b) => new Date(a.dueAt ?? 0).getTime() - new Date(b.dueAt ?? 0).getTime())
-  const filteredTasks = sortedTasks.filter(task => {
-    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
+  const leadById = new Map(workspace.leads.map(lead => [lead.id, lead]))
+  const taskRows = workspace.tasks.map(task => {
+    const lead = task.companyName ? leadByCompany.get(task.companyName) : undefined
+    const dueTime = task.dueAt ? new Date(task.dueAt).getTime() : 0
+    const overdue = Boolean(dueTime && dueTime < Date.now())
+    const dueToday = Boolean(dueTime && new Date(dueTime).toDateString() === new Date().toDateString())
+    const risky = task.priority === 'high' || lead?.risk === 'hot'
+    const urgencyScore = (overdue ? 50 : 0) + (dueToday ? 30 : 0) + (risky ? 25 : 0) + Number(lead?.probability ?? 0) / 5
+    return { ...task, lead, dueTime, overdue, dueToday, risky, urgencyScore }
+  }).sort((a, b) => b.urgencyScore - a.urgencyScore || a.dueTime - b.dueTime)
+
+  useEffect(() => {
+    if (!taskRows.length) return
+    if (!taskRows.some(task => task.id === selectedTaskId)) setSelectedTaskId(taskRows[0].id)
+  }, [selectedTaskId, taskRows])
+
+  const filteredTasks = taskRows.filter(task => {
+    const matchesMode =
+      workMode === 'all' ||
+      (workMode === 'focus' && (task.overdue || task.dueToday || task.risky)) ||
+      (workMode === 'today' && (task.overdue || task.dueToday)) ||
+      (workMode === 'risk' && task.risky)
     const matchesQuery = `${task.title} ${task.description} ${task.companyName} ${task.personName}`.toLowerCase().includes(query.toLowerCase())
-    return matchesPriority && matchesQuery
+    return matchesMode && matchesQuery
   })
-  const overdue = sortedTasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() < Date.now()).length
-  const high = sortedTasks.filter(task => task.priority === 'high').length
+  const selectedTask = taskRows.find(task => task.id === selectedTaskId) ?? taskRows[0]
+  const overdue = taskRows.filter(task => task.overdue).length
+  const riskyCount = taskRows.filter(task => task.risky).length
+  const dueNow = taskRows.filter(task => task.overdue || task.dueToday).length
+  const ownerRows = [...taskRows.reduce((map, task) => {
+    const owner = task.lead?.owner ?? 'Unassigned'
+    const current = map.get(owner) ?? { owner, tasks: 0, focus: 0, risk: 0, value: 0 }
+    current.tasks += 1
+    current.focus += task.overdue || task.dueToday ? 1 : 0
+    current.risk += task.risky ? 1 : 0
+    current.value += Number(task.lead?.valueAmount ?? 0)
+    map.set(owner, current)
+    return map
+  }, new Map<string, { owner: string; tasks: number; focus: number; risk: number; value: number }>()).values()]
+    .sort((a, b) => b.focus - a.focus || b.risk - a.risk)
+  const selectedLead = selectedTask?.lead ?? (leadId ? leadById.get(leadId) : undefined)
 
   async function createQueueTask() {
     if (!title.trim()) return
@@ -1654,12 +1689,14 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
           title,
           description,
           priority: lead?.risk === 'hot' ? 'high' : 'medium',
+          dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
           companyName: lead?.companyName,
           personName: lead?.primaryPersonName,
         }),
       })
       setTitle('')
       setDescription('')
+      setDueAt(dateInputValue(new Date(Date.now() + 86_400_000)))
       setNotice('Task created')
       await actions.refresh()
     } finally {
@@ -1680,93 +1717,206 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
   }
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="grid gap-4">
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatCard label="Open tasks" value={`${sortedTasks.length}`} detail="All current rep work items." icon={ClipboardList} />
-          <StatCard label="High priority" value={`${high}`} detail="Work tied to hot or late-stage deals." icon={ShieldAlert} />
-          <StatCard label="Due now" value={`${overdue}`} detail="Past-due or due-today follow-up pressure." icon={CalendarClock} />
-        </div>
-
-        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-          <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <CardTitle>Rep work queue</CardTitle>
-              <CardDescription>Every task stays connected to the account and the deal record.</CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Input
-                value={query}
-                onChange={event => setQuery(event.target.value)}
-                placeholder="Search tasks..."
-                className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
-              />
-              <select value={priorityFilter} onChange={event => setPriorityFilter(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
-                <option value="all">All priority</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {filteredTasks.map(task => {
-              const lead = task.companyName ? leadByCompany.get(task.companyName) : undefined
-              return (
-                <div
-                  key={task.id}
-                  className={cn(pillInsetClass, 'grid gap-3 p-4 transition hover:bg-white/[0.04] md:grid-cols-[minmax(0,1fr)_auto] md:items-center')}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-white">{task.title}</p>
-                      <Badge variant="outline" className={task.priority === 'high' ? 'border-red-400/25 bg-red-400/10 text-red-100' : 'border-white/10 bg-white/[0.04] text-zinc-300'}>
-                        {task.priority ?? 'medium'}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-xs text-zinc-500">{task.companyName ?? 'No account'} · {task.personName ?? 'No contact'}</p>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300">{task.description}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                    <div className="min-w-24 text-right text-xs text-zinc-500">
-                      <p>Due {shortDate(task.dueAt)}</p>
-                      {lead ? <p className="mt-2 text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</p> : null}
-                    </div>
-                    {lead ? (
-                      <Button type="button" variant="outline" size="sm" onClick={() => actions.selectLead(lead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
-                        Open deal
-                      </Button>
-                    ) : null}
-                    <Button type="button" size="sm" onClick={() => void completeTask(task.id)} disabled={completingTaskId === task.id} className="rounded-full bg-white text-black hover:bg-zinc-200">
-                      <CheckCircle2 className="size-3.5" />
-                      {completingTaskId === task.id ? 'Completing...' : 'Complete'}
-                    </Button>
-                  </div>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
+    <section className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Open tasks" value={`${taskRows.length}`} detail="Current execution load across active deals." icon={ClipboardList} />
+        <StatCard label="Due now" value={`${dueNow}`} detail={`${overdue} already past due.`} icon={CalendarClock} />
+        <StatCard label="Risk work" value={`${riskyCount}`} detail="High-priority or hot-deal follow-up." icon={ShieldAlert} />
+        <StatCard label="Owners loaded" value={`${ownerRows.length}`} detail="People with assigned work in this queue." icon={Users} />
       </div>
 
-      <Card className={cn(pillSurfaceClass, 'h-fit bg-[#101316]')}>
-        <CardHeader>
-          <CardTitle>Create task</CardTitle>
-          <CardDescription>Add a next action against an active deal.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          {notice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{notice}</div> : null}
-          <select value={leadId} onChange={event => setLeadId(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
-            {workspace.leads.map(lead => <option key={lead.id} value={lead.id}>{lead.companyName}</option>)}
-          </select>
-          <Input value={title} onChange={event => setTitle(event.target.value)} placeholder="Task title" className="rounded-full border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
-          <Textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Task detail..." className="min-h-28 rounded-[22px] border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
-          <Button type="button" onClick={() => void createQueueTask()} disabled={busy || !title.trim()} className="rounded-full bg-white text-black hover:bg-zinc-200">
-            <Plus className="size-4" />
-            {busy ? 'Creating...' : 'Create task'}
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid gap-4">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Today&apos;s execution cockpit</CardTitle>
+                  <CardDescription>Prioritized work by deal risk, due pressure, and revenue context.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ['focus', 'Focus'],
+                    ['today', 'Due now'],
+                    ['risk', 'Risk'],
+                    ['all', 'All'],
+                  ].map(([value, label]) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setWorkMode(value as typeof workMode)}
+                      className={cn(
+                        'rounded-full border-white/10',
+                        workMode === value ? 'bg-white text-black hover:bg-zinc-200' : 'bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08]',
+                      )}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+              <div className="grid gap-3">
+                <Input
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder="Search tasks..."
+                  className="h-10 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
+                />
+                <div className={cn(pillInsetClass, 'p-4')}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Owner load</p>
+                  <div className="mt-4 grid gap-2">
+                    {ownerRows.map(owner => (
+                      <div key={owner.owner} className="rounded-[18px] border border-white/10 bg-black/20 p-3">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="truncate font-medium text-white">{owner.owner}</span>
+                          <span className="text-zinc-400">{owner.tasks}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-zinc-500">{owner.focus} due now · {owner.risk} risk · {money(owner.value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {filteredTasks.map(task => {
+                  const selected = task.id === selectedTask?.id
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => setSelectedTaskId(task.id)}
+                      className={cn(
+                        pillInsetClass,
+                        'grid gap-3 p-4 text-left transition md:grid-cols-[minmax(0,1fr)_auto] md:items-center',
+                        selected ? 'border-blue-300/30 bg-blue-400/10' : 'hover:bg-white/[0.04]',
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-white">{task.title}</p>
+                          <Badge variant="outline" className={task.risky ? 'border-red-400/25 bg-red-400/10 text-red-100' : 'border-white/10 bg-white/[0.04] text-zinc-300'}>
+                            {task.priority ?? 'medium'}
+                          </Badge>
+                          {task.overdue ? <Badge variant="outline" className="border-yellow-300/25 bg-yellow-300/10 text-yellow-100">overdue</Badge> : null}
+                        </div>
+                        <p className="mt-1 truncate text-xs text-zinc-500">{task.companyName ?? 'No account'} · {task.personName ?? 'No contact'} · {task.lead?.owner ?? 'Unassigned'}</p>
+                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-300">{task.description}</p>
+                      </div>
+                      <div className="grid gap-2 text-right text-xs">
+                        <span className="text-zinc-500">Due {shortDate(task.dueAt)}</span>
+                        {task.lead ? <span className="font-semibold text-zinc-200">{money(Number(task.lead.valueAmount ?? 0))}</span> : null}
+                      </div>
+                    </button>
+                  )
+                })}
+                {!filteredTasks.length ? <p className={cn(pillInsetClass, 'p-4 text-sm text-zinc-500')}>No tasks match this view.</p> : null}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Create next action</CardTitle>
+              <CardDescription>Create useful work against a real deal, with due date and buyer context attached.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)_170px_auto] md:items-start">
+              {notice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100 md:col-span-4">{notice}</div> : null}
+              <select value={leadId} onChange={event => setLeadId(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+                {workspace.leads.map(lead => <option key={lead.id} value={lead.id}>{lead.companyName}</option>)}
+              </select>
+              <div className="grid gap-3">
+                <Input value={title} onChange={event => setTitle(event.target.value)} placeholder="Task title" className="rounded-full border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
+                <Textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Task detail..." className="min-h-24 rounded-[22px] border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
+              </div>
+              <Input value={dueAt} type="date" onChange={event => setDueAt(event.target.value)} className="h-10 rounded-full border-white/10 bg-black/20 text-white" />
+              <Button type="button" onClick={() => void createQueueTask()} disabled={busy || !title.trim()} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                <Plus className="size-4" />
+                {busy ? 'Creating...' : 'Create'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <aside className="grid h-fit gap-4">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle>{selectedTask?.title ?? 'No task selected'}</CardTitle>
+                  <CardDescription>{selectedTask?.companyName ?? 'Select work from the queue'}</CardDescription>
+                </div>
+                {selectedTask ? <Badge variant="outline" className={selectedTask.risky ? 'border-red-400/25 bg-red-400/10 text-red-100' : 'border-white/10 bg-white/[0.04] text-zinc-300'}>{selectedTask.priority ?? 'medium'}</Badge> : null}
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {selectedTask ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Due</p>
+                      <p className="mt-1 font-semibold text-white">{shortDate(selectedTask.dueAt)}</p>
+                    </div>
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Owner</p>
+                      <p className="mt-1 truncate font-semibold text-white">{selectedLead?.owner ?? 'Unassigned'}</p>
+                    </div>
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Deal value</p>
+                      <p className="mt-1 font-semibold text-white">{money(Number(selectedLead?.valueAmount ?? 0))}</p>
+                    </div>
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Risk</p>
+                      <p className="mt-1 font-semibold text-white">{selectedLead?.risk ?? 'n/a'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Why it matters</p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-300">{selectedTask.description || selectedLead?.nextStep || 'Complete this action and update the deal context.'}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedLead ? (
+                      <Button type="button" variant="outline" onClick={() => actions.selectLead(selectedLead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                        Open deal
+                        <ArrowUpRight className="size-4" />
+                      </Button>
+                    ) : null}
+                    <Button type="button" onClick={() => void completeTask(selectedTask.id)} disabled={completingTaskId === selectedTask.id} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                      <CheckCircle2 className="size-4" />
+                      {completingTaskId === selectedTask.id ? 'Completing...' : 'Complete task'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-zinc-500">No active task selected.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {selectedLead ? (
+            <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+              <CardHeader>
+                <CardTitle>Deal context</CardTitle>
+                <CardDescription>Keep task work tied to the commercial motion.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                <div className="flex items-center gap-3">
+                  <DealAvatar value={selectedLead.companyName} />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-white">{selectedLead.companyName}</p>
+                    <p className="truncate text-xs text-zinc-500">{selectedLead.primaryPersonName} · {selectedLead.stageName || selectedLead.stage}</p>
+                  </div>
+                </div>
+                <p className="rounded-[24px] border border-white/10 bg-black/20 p-4 text-sm leading-6 text-zinc-300">{selectedLead.nextStep || 'No next step captured yet.'}</p>
+              </CardContent>
+            </Card>
+          ) : null}
+        </aside>
+      </div>
     </section>
   )
 }
