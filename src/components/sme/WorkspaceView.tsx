@@ -39,6 +39,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { pillInsetClass, pillSurfaceClass } from '@/components/sme/halvex-system'
 import { cn } from '@/lib/utils'
+import { classifyRecoveryIntent, type RecoveryInsight } from '@/lib/recovery-intelligence'
 
 type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'reports' | 'coach' | 'channels'
 
@@ -1687,6 +1688,10 @@ function ReportsView({ workspace, actions }: { workspace: CrmWorkspacePayload; a
 }
 
 function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const [busyCoachAction, setBusyCoachAction] = useState<string | null>(null)
+  const [coachNotice, setCoachNotice] = useState<string | null>(null)
+  const [draftLead, setDraftLead] = useState<CrmLeadDto | null>(null)
+  const [draftText, setDraftText] = useState('')
   const rankedLeads = [...workspace.leads]
     .sort((a, b) => (
       Number(b.valueAmount ?? 0) * (100 - Number(b.probability ?? 0)) + Number(b.openTaskCount ?? 0) * 2500
@@ -1694,6 +1699,61 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
       Number(a.valueAmount ?? 0) * (100 - Number(a.probability ?? 0)) + Number(a.openTaskCount ?? 0) * 2500
     ))
     .slice(0, 5)
+  const relatedLeads = (item: RecoveryInsight) => {
+    const matches = workspace.leads.filter(lead => lead.status !== 'won' && classifyRecoveryIntent(lead) === item.intentId)
+    return (matches.length ? matches : rankedLeads).slice(0, Math.max(1, Math.min(item.count || 3, 4)))
+  }
+  const taskExists = (lead: CrmLeadDto, title: string) => workspace.tasks.some(task => (
+    task.companyName === lead.companyName && (task.title ?? '').trim().toLowerCase() === title.trim().toLowerCase()
+  ))
+  const actionableLeads = (item: RecoveryInsight) => relatedLeads(item).filter(lead => !taskExists(lead, item.title))
+
+  async function createRecommendationTasks(item: RecoveryInsight) {
+    const targets = actionableLeads(item)
+    if (!targets.length) {
+      setCoachNotice('Those coaching tasks already exist')
+      return
+    }
+    setBusyCoachAction(`tasks:${item.id}`)
+    setCoachNotice(null)
+    try {
+      await Promise.all(targets.map(lead => apiJson('/api/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: lead.id,
+          title: item.title,
+          description: `${item.body}\n\nNext step: ${lead.nextStep || 'Confirm the next milestone.'}`,
+          priority: item.priority === 'high' ? 'high' : item.priority === 'medium' ? 'medium' : 'low',
+          companyName: lead.companyName,
+          personName: lead.primaryPersonName,
+        }),
+      })))
+      await actions.refresh()
+      setCoachNotice(`${targets.length} coaching task${targets.length === 1 ? '' : 's'} created`)
+    } finally {
+      setBusyCoachAction(null)
+    }
+  }
+
+  async function draftFollowUp(lead: CrmLeadDto) {
+    setBusyCoachAction(`draft:${lead.id}`)
+    setCoachNotice(null)
+    try {
+      const payload = await apiJson<{ draft: string }>('/api/ai/draft', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: lead.id,
+          channel: lead.channel,
+          instruction: `Use the coaching context and focus on the next step: ${lead.nextStep}`,
+        }),
+      })
+      setDraftLead(lead)
+      setDraftText(payload.draft)
+      setCoachNotice(`Draft ready for ${lead.companyName}`)
+    } finally {
+      setBusyCoachAction(null)
+    }
+  }
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -1703,39 +1763,82 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
           <CardDescription>AI belongs here: ranked work, evidence, and a clear reason to act.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {workspace.intelligence.recommendations.map(item => (
-            <div key={item.id} className={cn(pillInsetClass, 'p-4')}>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">{item.priority}</Badge>
-                  <h2 className="mt-3 text-base font-semibold text-white">{item.title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">{item.body}</p>
+          {coachNotice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{coachNotice}</div> : null}
+          {workspace.intelligence.recommendations.map(item => {
+            const related = relatedLeads(item)
+            const actionable = actionableLeads(item)
+            return (
+              <div key={item.id} className={cn(pillInsetClass, 'p-4')}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">{item.priority}</Badge>
+                    <h2 className="mt-3 text-base font-semibold text-white">{item.title}</h2>
+                    <p className="mt-2 text-sm leading-6 text-zinc-400">{item.body}</p>
+                    <p className="mt-3 text-xs text-zinc-500">{related.map(lead => lead.companyName).join(' · ')}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-white">{money(item.estimatedValue)}</p>
                 </div>
-                <p className="text-sm font-semibold text-white">{money(item.estimatedValue)}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" onClick={() => void createRecommendationTasks(item)} disabled={busyCoachAction === `tasks:${item.id}` || !actionable.length} className="rounded-full bg-white text-black hover:bg-zinc-200 disabled:bg-white/20 disabled:text-zinc-500">
+                    <ClipboardList className="size-3.5" />
+                    {busyCoachAction === `tasks:${item.id}` ? 'Creating...' : actionable.length ? `Create ${actionable.length} task${actionable.length === 1 ? '' : 's'}` : 'Tasks exist'}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => actions.selectLead(related[0].id)} disabled={!related[0]} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                    Open top deal
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </CardContent>
       </Card>
 
-      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-        <CardHeader>
-          <CardTitle>Deal coaching queue</CardTitle>
-          <CardDescription>Open a record, draft a reply, save notes, or create a task.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          {rankedLeads.map(lead => (
-            <button key={lead.id} type="button" onClick={() => actions.selectLead(lead.id)} className={cn(pillInsetClass, 'p-4 text-left transition hover:bg-white/[0.07]')}>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-white">{lead.companyName}</p>
-                <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+      <div className="grid content-start gap-4">
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Deal coaching queue</CardTitle>
+            <CardDescription>Open a record, draft a reply, save notes, or create a task.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {rankedLeads.map(lead => (
+              <div key={lead.id} className={cn(pillInsetClass, 'p-4')}>
+                <button type="button" onClick={() => actions.selectLead(lead.id)} className="block w-full text-left">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-white">{lead.companyName}</p>
+                    <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">{lead.nextStep}</p>
+                  <p className="mt-3 text-xs text-zinc-400">{money(Number(lead.valueAmount ?? 0))} · {Number(lead.probability ?? 0)}% probability</p>
+                </button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => void draftFollowUp(lead)} disabled={busyCoachAction === `draft:${lead.id}`} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                    <Bot className="size-3.5" />
+                    {busyCoachAction === `draft:${lead.id}` ? 'Drafting...' : 'Draft reply'}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => actions.selectLead(lead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                    Open
+                  </Button>
+                </div>
               </div>
-              <p className="mt-2 text-xs leading-5 text-zinc-500">{lead.nextStep}</p>
-              <p className="mt-3 text-xs text-zinc-400">{money(Number(lead.valueAmount ?? 0))} · {Number(lead.probability ?? 0)}% probability</p>
-            </button>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+
+        {draftLead ? (
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Draft follow-up</CardTitle>
+              <CardDescription>{draftLead.companyName} · {channelLabel(draftLead.channel)}</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <Textarea value={draftText} onChange={event => setDraftText(event.target.value)} className="min-h-52 rounded-[24px] border-white/10 bg-black/20 text-sm leading-6 text-white" />
+              <Button type="button" onClick={() => actions.selectLead(draftLead.id)} className="w-fit rounded-full bg-white text-black hover:bg-zinc-200">
+                Open deal to send
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
     </section>
   )
 }

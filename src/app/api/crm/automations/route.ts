@@ -5,13 +5,13 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { logWorkspaceEvent } from '@/lib/audit'
 import { buildAutomationRecommendations, crmAutomationRules, recommendationToTask } from '@/lib/crm-automations'
-import { addDemoCrmTask, createCrmTask, getCrmWorkspacePayload, getDemoCrmWorkspacePayload } from '@/lib/sme-crm'
+import { addDemoCrmTask, createCrmTask, getCrmWorkspacePayload, getDemoCrmWorkspaceState } from '@/lib/sme-crm'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 export async function GET() {
   try {
     if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
-      const workspace = getDemoCrmWorkspacePayload()
+      const workspace = getDemoCrmWorkspaceState()
       return NextResponse.json({ rules: crmAutomationRules, recommendations: buildAutomationRecommendations(workspace) })
     }
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const selectedIds = Array.isArray(body.recommendationIds) ? new Set(body.recommendationIds.filter(id => typeof id === 'string')) : null
 
     if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
-      const workspace = getDemoCrmWorkspacePayload()
+      const workspace = getDemoCrmWorkspaceState()
       const recommendations = buildAutomationRecommendations(workspace).filter(item => !selectedIds || selectedIds.has(item.id))
       const tasks = recommendations.map(item => addDemoCrmTask(recommendationToTask(item))).filter(Boolean)
       return NextResponse.json({ created: tasks.length, tasks, recommendations })
