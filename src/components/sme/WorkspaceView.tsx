@@ -724,6 +724,18 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
     return leadMatchesFilters(lead, activeFilters)
   })
   const pipelineStages = ['Discovery', 'Evaluation', 'Proposal', 'Negotiation', 'Commit']
+  const openFilteredLeads = filteredLeads.filter(lead => lead.status !== 'won' && lead.status !== 'lost')
+  const closedFilteredLeads = filteredLeads.filter(lead => lead.status === 'won' || lead.status === 'lost')
+  const pipelineValue = openFilteredLeads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+  const weightedValue = openFilteredLeads.reduce((sum, lead) => sum + Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100), 0)
+  const riskLeads = openFilteredLeads
+    .filter(lead => lead.risk === 'hot' || Number(lead.probability ?? 0) < 45)
+    .sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0))
+    .slice(0, 3)
+  const closingSoon = [...openFilteredLeads]
+    .filter(lead => lead.expectedCloseDate)
+    .sort((a, b) => new Date(a.expectedCloseDate ?? 0).getTime() - new Date(b.expectedCloseDate ?? 0).getTime())
+    .slice(0, 3)
 
   useEffect(() => {
     let active = true
@@ -798,6 +810,88 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 
   return (
     <div className="grid gap-4">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
+        <Card className={cn(pillSurfaceClass, 'overflow-hidden bg-[#101316]')}>
+          <CardHeader className="border-b border-white/8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle>Pipeline cockpit</CardTitle>
+                <CardDescription>Filtered health, forecast weight, and close pressure before you touch the board.</CardDescription>
+              </div>
+              <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{filteredLeads.length} matching deals</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 p-4 md:grid-cols-4">
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Open value</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{money(pipelineValue)}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">{openFilteredLeads.length} open · {closedFilteredLeads.length} closed in view.</p>
+            </div>
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Weighted</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{money(weightedValue)}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">{pipelineValue ? Math.round((weightedValue / pipelineValue) * 100) : 0}% blended confidence.</p>
+            </div>
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Risk pocket</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{riskLeads.length}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">{money(riskLeads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0))} needs proof or next-step control.</p>
+            </div>
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Next close</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{closingSoon[0] ? shortDate(closingSoon[0].expectedCloseDate) : 'None'}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">{closingSoon[0]?.companyName ?? 'No dated close in this view.'}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Deal pressure</CardTitle>
+            <CardDescription>What the pipeline manager should inspect first.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-white">At risk</p>
+                <Badge variant="outline" className="border-red-300/20 bg-red-300/10 text-red-100">{riskLeads.length}</Badge>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {riskLeads.map(lead => (
+                  <button key={lead.id} type="button" onClick={() => actions.selectLead(lead.id)} className="flex items-center justify-between gap-3 rounded-full border border-white/8 bg-black/20 px-3 py-2 text-left transition hover:bg-white/[0.06]">
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium text-zinc-200">{lead.companyName}</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{lead.nextStep}</span>
+                    </span>
+                    <span className="shrink-0 text-xs text-zinc-400">{money(Number(lead.valueAmount ?? 0))}</span>
+                  </button>
+                ))}
+                {!riskLeads.length ? <p className="text-xs text-zinc-500">No risky deals in this filtered view.</p> : null}
+              </div>
+            </div>
+
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-white">Closing soon</p>
+                <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">{closingSoon.length}</Badge>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {closingSoon.map(lead => (
+                  <button key={lead.id} type="button" onClick={() => actions.selectLead(lead.id)} className="flex items-center justify-between gap-3 rounded-full border border-white/8 bg-black/20 px-3 py-2 text-left transition hover:bg-white/[0.06]">
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium text-zinc-200">{lead.companyName}</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{lead.stageName}</span>
+                    </span>
+                    <span className="shrink-0 text-xs text-zinc-400">{shortDate(lead.expectedCloseDate)}</span>
+                  </button>
+                ))}
+                {!closingSoon.length ? <p className="text-xs text-zinc-500">Add close dates to make this queue useful.</p> : null}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader>
           <CardTitle>Pipeline board</CardTitle>
@@ -805,12 +899,16 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
         </CardHeader>
         <CardContent className="grid gap-3 xl:grid-cols-5">
           {pipelineStages.map(stage => {
-            const stageLeads = workspace.leads.filter(lead => (lead.stageName || lead.stage) === stage && lead.status !== 'won' && lead.status !== 'lost')
+            const stageLeads = openFilteredLeads.filter(lead => (lead.stageName || lead.stage) === stage)
+            const stageValue = stageLeads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
             return (
               <div key={stage} className={cn(pillInsetClass, 'grid content-start gap-3 p-3')}>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-white">{stage}</p>
-                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{stageLeads.length}</Badge>
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-white">{stage}</p>
+                    <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{stageLeads.length}</Badge>
+                  </div>
+                  <p className="text-xs text-zinc-500">{money(stageValue)} open · {stageLeads.filter(lead => lead.risk === 'hot').length} hot</p>
                 </div>
                 {stageLeads.map(lead => {
                   const currentIndex = pipelineStages.indexOf(stage)
@@ -837,6 +935,11 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
                     </div>
                   )
                 })}
+                {!stageLeads.length ? (
+                  <div className="rounded-[20px] border border-dashed border-white/10 bg-black/10 p-4 text-xs leading-5 text-zinc-600">
+                    No deals in this lane for the current filters.
+                  </div>
+                ) : null}
               </div>
             )
           })}
