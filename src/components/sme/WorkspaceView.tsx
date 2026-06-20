@@ -876,12 +876,64 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 }
 
 function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const [selectedLeadId, setSelectedLeadId] = useState('')
+  const [reply, setReply] = useState('')
+  const [busyInbox, setBusyInbox] = useState<'draft' | 'send' | null>(null)
+  const [inboxNotice, setInboxNotice] = useState<string | null>(null)
   const allMessages = Object.entries(workspace.messages).flatMap(([channel, messages]) =>
     messages.map(message => ({ ...message, channel: channel as ChannelId })),
   ).sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
+  const selectedLead = workspace.leads.find(lead => lead.id === selectedLeadId) ?? workspace.leads.find(lead => lead.id === allMessages[0]?.leadId) ?? workspace.leads[0]
+  const thread = selectedLead ? leadMessages(workspace, selectedLead.id).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()) : []
+
+  useEffect(() => {
+    if (!selectedLeadId && selectedLead?.id) setSelectedLeadId(selectedLead.id)
+  }, [selectedLead?.id, selectedLeadId])
+
+  async function draftReply() {
+    if (!selectedLead) return
+    setBusyInbox('draft')
+    setInboxNotice(null)
+    try {
+      const payload = await apiJson<{ draft: string }>('/api/ai/draft', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: selectedLead.id,
+          channel: selectedLead.channel,
+          instruction: `Reply from the inbox. Keep it concise and move this next step forward: ${selectedLead.nextStep}`,
+        }),
+      })
+      setReply(payload.draft)
+      setInboxNotice(`Draft ready for ${selectedLead.companyName}`)
+    } finally {
+      setBusyInbox(null)
+    }
+  }
+
+  async function sendReply() {
+    if (!selectedLead || !reply.trim()) return
+    setBusyInbox('send')
+    setInboxNotice(null)
+    try {
+      await apiJson('/api/crm/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: selectedLead.id,
+          channel: selectedLead.channel,
+          from: 'rep',
+          text: reply.trim(),
+        }),
+      })
+      setReply('')
+      await actions.refresh()
+      setInboxNotice(`Reply sent to ${selectedLead.companyName}`)
+    } finally {
+      setBusyInbox(null)
+    }
+  }
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+    <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,0.9fr)_minmax(360px,0.9fr)]">
       <div className="grid content-start gap-3">
         {workspace.channels.map(channel => {
           const Icon = CHANNEL_ICONS[channel.id]
@@ -907,8 +959,8 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader>
-          <CardTitle>Latest conversations</CardTitle>
-          <CardDescription>Every row should connect back to a deal and a next action.</CardDescription>
+          <CardTitle>Conversation queue</CardTitle>
+          <CardDescription>Prioritize buyer messages, then work the thread without leaving inbox.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
           {allMessages.map((message: CrmMessageDto) => {
@@ -918,8 +970,12 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
               <button
                 key={message.id}
                 type="button"
-                onClick={() => lead ? actions.selectLead(lead.id) : undefined}
-                className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start')}
+                onClick={() => lead ? setSelectedLeadId(lead.id) : undefined}
+                className={cn(
+                  pillInsetClass,
+                  'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start',
+                  selectedLead?.id === lead?.id && 'border-blue-300/30 bg-blue-300/10',
+                )}
               >
                 <span className="grid size-9 place-items-center rounded-full bg-white/[0.06] text-zinc-300"><Icon className="size-4" /></span>
                 <div className="min-w-0">
@@ -931,6 +987,62 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
               </button>
             )
           })}
+        </CardContent>
+      </Card>
+
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader className="gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="truncate">{selectedLead?.companyName ?? 'Select a conversation'}</CardTitle>
+              <CardDescription>{selectedLead ? `${selectedLead.primaryPersonName} · ${channelLabel(selectedLead.channel)} · ${selectedLead.stageName}` : 'Choose a thread to reply.'}</CardDescription>
+            </div>
+            {selectedLead ? <Badge variant="outline" className={riskTone(selectedLead.risk)}>{selectedLead.risk}</Badge> : null}
+          </div>
+          {selectedLead ? (
+            <div className={cn(pillInsetClass, 'grid gap-2 p-3 text-xs text-zinc-500')}>
+              <p className="text-zinc-300">{selectedLead.nextStep}</p>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{money(Number(selectedLead.valueAmount ?? 0))}</Badge>
+                <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{selectedLead.probability}% probability</Badge>
+              </div>
+            </div>
+          ) : null}
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          {inboxNotice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{inboxNotice}</div> : null}
+
+          <div className="grid max-h-[360px] gap-3 overflow-y-auto pr-1">
+            {thread.map(message => (
+              <div key={message.id} className={cn('max-w-[88%] rounded-[22px] border p-4', message.from === 'rep' || message.from === 'ai' ? 'ml-auto border-blue-300/20 bg-blue-300/10' : 'border-white/10 bg-white/[0.04]')}>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-medium text-zinc-400">{message.from === 'rep' ? 'You' : message.from === 'ai' ? 'AI draft' : selectedLead?.primaryPersonName ?? 'Buyer'}</p>
+                  <span className="text-[11px] text-zinc-600">{shortDate(message.sentAt)}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-zinc-200">{message.text}</p>
+              </div>
+            ))}
+            {!thread.length ? <div className="py-12 text-center text-sm text-zinc-500">No messages in this thread yet.</div> : null}
+          </div>
+
+          <div className="grid gap-3">
+            <Textarea value={reply} onChange={event => setReply(event.target.value)} placeholder="Write a reply grounded in this deal..." className="min-h-36 rounded-[24px] border-white/10 bg-black/20 text-sm leading-6 text-white placeholder:text-zinc-600" />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void draftReply()} disabled={!selectedLead || busyInbox !== null} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                <Bot className="size-4" />
+                {busyInbox === 'draft' ? 'Drafting...' : 'Draft reply'}
+              </Button>
+              <Button type="button" onClick={() => void sendReply()} disabled={!selectedLead || !reply.trim() || busyInbox !== null} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                <Send className="size-4" />
+                {busyInbox === 'send' ? 'Sending...' : 'Send reply'}
+              </Button>
+              {selectedLead ? (
+                <Button type="button" variant="outline" onClick={() => actions.selectLead(selectedLead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                  Open deal
+                </Button>
+              ) : null}
+            </div>
+          </div>
         </CardContent>
       </Card>
     </section>
