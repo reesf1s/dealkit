@@ -82,7 +82,10 @@ export default function SettingsPage() {
             </span>
             <div>
               <h2 className="text-base font-semibold">Team access</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Invite controls and seat management are staged for the next release.</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Owner performance, workload, and pipeline coverage now live in the team workspace.</p>
+              <Button asChild variant="outline" className="mt-4">
+                <Link href="/team">Open team workspace</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

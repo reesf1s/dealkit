@@ -23,6 +23,7 @@ import {
   Send,
   ShieldAlert,
   TrendingUp,
+  Users,
 } from 'lucide-react'
 
 import type { ChannelId, CrmLeadDto, CrmMessageDto, CrmWorkspacePayload } from '@/lib/sme-crm'
@@ -39,7 +40,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { pillInsetClass, pillSurfaceClass } from '@/components/sme/halvex-system'
 import { cn } from '@/lib/utils'
 
-type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'meetings' | 'forecast' | 'coach' | 'channels'
+type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'coach' | 'channels'
 
 type WorkspaceAction = {
   selectLead: (leadId: string) => void
@@ -97,6 +98,11 @@ const VIEW_COPY: Record<WorkspaceViewName, { eyebrow: string; title: string; des
     eyebrow: 'Call intelligence',
     title: 'Meetings',
     description: 'Customer conversations, transcript-style notes, decision signals, objections, and follow-up capture.',
+  },
+  team: {
+    eyebrow: 'Team',
+    title: 'Owner performance',
+    description: 'Pipeline ownership, workload, risk, activity, and forecast coverage by seller.',
   },
   forecast: {
     eyebrow: 'Forecast',
@@ -227,6 +233,50 @@ function useAccounts(workspace: CrmWorkspacePayload) {
         latestAt: latestDates.length ? new Date(Math.max(...latestDates)).toISOString() : lead.latestActivityAt,
       }
     }).sort((a, b) => b.weightedValue - a.weightedValue)
+  }, [workspace])
+}
+
+function useOwners(workspace: CrmWorkspacePayload) {
+  return useMemo(() => {
+    const owners = new Map<string, {
+      owner: string
+      deals: CrmLeadDto[]
+      tasks: number
+      activities: number
+      pipeline: number
+      weighted: number
+      atRisk: number
+      won: number
+    }>()
+
+    for (const lead of workspace.leads) {
+      const owner = lead.owner || 'Unassigned'
+      const current = owners.get(owner) ?? { owner, deals: [], tasks: 0, activities: 0, pipeline: 0, weighted: 0, atRisk: 0, won: 0 }
+      current.deals.push(lead)
+      current.pipeline += Number(lead.valueAmount ?? 0)
+      current.weighted += Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100)
+      current.atRisk += lead.risk === 'hot' || Number(lead.probability ?? 0) < 45 ? 1 : 0
+      current.won += lead.status === 'won' ? Number(lead.valueAmount ?? 0) : 0
+      owners.set(owner, current)
+    }
+
+    for (const task of workspace.tasks) {
+      const lead = workspace.leads.find(candidate => candidate.companyName === task.companyName || candidate.primaryPersonName === task.personName)
+      const owner = lead?.owner || 'Unassigned'
+      const current = owners.get(owner) ?? { owner, deals: [], tasks: 0, activities: 0, pipeline: 0, weighted: 0, atRisk: 0, won: 0 }
+      current.tasks += 1
+      owners.set(owner, current)
+    }
+
+    for (const activity of workspace.activities) {
+      const lead = activityLead(workspace, activity)
+      const owner = lead?.owner || 'Unassigned'
+      const current = owners.get(owner) ?? { owner, deals: [], tasks: 0, activities: 0, pipeline: 0, weighted: 0, atRisk: 0, won: 0 }
+      current.activities += 1
+      owners.set(owner, current)
+    }
+
+    return [...owners.values()].sort((a, b) => b.weighted - a.weighted)
   }, [workspace])
 }
 
@@ -1061,6 +1111,82 @@ function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
   )
 }
 
+function TeamView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const owners = useOwners(workspace)
+  const totalPipeline = owners.reduce((sum, owner) => sum + owner.pipeline, 0)
+  const totalWeighted = owners.reduce((sum, owner) => sum + owner.weighted, 0)
+  const totalTasks = owners.reduce((sum, owner) => sum + owner.tasks, 0)
+  const totalAtRisk = owners.reduce((sum, owner) => sum + owner.atRisk, 0)
+
+  return (
+    <section className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Owners" value={`${owners.length}`} detail="Sellers with active pipeline or work." icon={Users} />
+        <StatCard label="Pipeline" value={money(totalPipeline)} detail="Total owner-assigned open value." icon={TrendingUp} />
+        <StatCard label="Weighted" value={money(totalWeighted)} detail="Forecast-weighted owner rollup." icon={Gauge} />
+        <StatCard label="Open work" value={`${totalTasks}`} detail={`${totalAtRisk} risky owner-owned deals.`} icon={ClipboardList} />
+      </div>
+
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader>
+          <CardTitle>Owner scorecards</CardTitle>
+          <CardDescription>Manager view for pipeline, forecast, risk, activity, and follow-up load.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {owners.map(owner => (
+            <div key={owner.owner} className={cn(pillInsetClass, 'grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]')}>
+              <div>
+                <div className="flex items-center gap-3">
+                  <DealAvatar value={owner.owner} />
+                  <div>
+                    <p className="font-semibold text-white">{owner.owner}</p>
+                    <p className="text-xs text-zinc-500">{owner.deals.length} deals · {owner.tasks} tasks · {owner.activities} activities</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
+                    <p className="text-zinc-500">Pipeline</p>
+                    <p className="mt-1 font-semibold text-white">{money(owner.pipeline)}</p>
+                  </div>
+                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
+                    <p className="text-zinc-500">Weighted</p>
+                    <p className="mt-1 font-semibold text-white">{money(owner.weighted)}</p>
+                  </div>
+                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
+                    <p className="text-zinc-500">At risk</p>
+                    <p className="mt-1 font-semibold text-white">{owner.atRisk}</p>
+                  </div>
+                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
+                    <p className="text-zinc-500">Won</p>
+                    <p className="mt-1 font-semibold text-white">{money(owner.won)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0">
+                <div className="grid gap-2">
+                  {owner.deals.slice(0, 4).map(lead => (
+                    <button key={lead.id} type="button" onClick={() => actions.selectLead(lead.id)} className="grid gap-2 rounded-[18px] border border-white/10 bg-black/20 p-3 text-left transition hover:bg-white/[0.06] md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white">{lead.companyName}</p>
+                        <p className="mt-1 truncate text-xs text-zinc-500">{lead.stageName} · {lead.nextStep}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                        <span className="text-sm font-semibold text-zinc-200">{money(Number(lead.valueAmount ?? 0))}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+
 function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const metrics = useWorkspaceMetrics(workspace)
   const maxValue = Math.max(...metrics.stages.map(stage => stage.value), 1)
@@ -1642,6 +1768,7 @@ export default function WorkspaceView({ view }: { view: WorkspaceViewName }) {
       {view === 'accounts' ? <AccountsView workspace={workspace} actions={actions} /> : null}
       {view === 'tasks' ? <TasksView workspace={workspace} actions={actions} /> : null}
       {view === 'meetings' ? <MeetingsView workspace={workspace} actions={actions} /> : null}
+      {view === 'team' ? <TeamView workspace={workspace} actions={actions} /> : null}
       {view === 'forecast' ? <ForecastView workspace={workspace} actions={actions} /> : null}
       {view === 'coach' ? <CoachView workspace={workspace} actions={actions} /> : null}
       {view === 'channels' ? <ChannelsView workspace={workspace} actions={actions} /> : null}
