@@ -15,11 +15,11 @@ const clerkConfigured =
 
 export default clerkConfigured
   ? clerkMiddleware(async (auth, request) => {
+      if (request.nextUrl.pathname.startsWith('/api')) {
+        return NextResponse.next()
+      }
+
       if (!isPublicRoute(request)) {
-        if (request.nextUrl.pathname.startsWith('/api')) {
-          await auth.protect()
-          return
-        }
         await auth.protect({
           unauthenticatedUrl: new URL('/sign-in', request.url).toString(),
         })

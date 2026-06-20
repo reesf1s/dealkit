@@ -101,9 +101,9 @@ function RailNavItem({ item }: { item: NavLink }) {
 
 export default function SmeDashboardShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#8f979e] p-2 text-zinc-100 sm:p-5 lg:p-8">
-      <div className="mx-auto flex min-h-[calc(100vh-1rem)] w-full max-w-[1460px] overflow-hidden rounded-[30px] border border-white/10 bg-[#050607] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[calc(100vh-2.5rem)] lg:min-h-[calc(100vh-4rem)]">
-        <aside className="hidden w-[58px] shrink-0 flex-col items-center border-r border-white/8 bg-black/90 py-4 md:flex">
+    <div className="min-h-screen overflow-hidden bg-[#080a0d] text-zinc-100">
+      <div className="flex h-screen min-h-screen w-full overflow-hidden bg-[#050607]">
+        <aside className="hidden w-16 shrink-0 flex-col items-center border-r border-white/8 bg-black py-4 md:flex">
           <Link
             href="/home"
             className="grid size-9 place-items-center rounded-full border border-white/10 bg-white text-sm font-black text-black shadow-[0_8px_28px_rgba(255,255,255,0.08)]"
@@ -170,7 +170,7 @@ export default function SmeDashboardShell({ children }: { children: ReactNode })
             </div>
           </header>
 
-          <main className="min-w-0 flex-1 overflow-y-auto bg-[#0b0d0f] p-3 sm:p-4 lg:p-5">
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#0b0d0f] p-3 sm:p-4 lg:p-5">
             {children}
           </main>
         </div>

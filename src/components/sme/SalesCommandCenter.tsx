@@ -22,7 +22,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { pillInsetClass, pillSurfaceClass, tableRowClass } from '@/components/sme/halvex-system'
 import { cn } from '@/lib/utils'
 
-const DEMO_STORAGE_KEY = 'halvex-demo-workspace-v3'
 const EMPTY_LEADS: CrmLeadDto[] = []
 const EMPTY_CHANNELS: CrmChannelDto[] = []
 
@@ -250,36 +249,6 @@ function recalculateWorkspace(workspace: CrmWorkspacePayload): CrmWorkspacePaylo
   }
 }
 
-function workspaceLooksUsable(value: unknown): value is CrmWorkspacePayload {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<CrmWorkspacePayload>
-  return Array.isArray(candidate.leads) && Array.isArray(candidate.channels) && Boolean(candidate.messages)
-}
-
-function hydrateDemoWorkspace(fresh: CrmWorkspacePayload) {
-  if (!fresh.demo || typeof window === 'undefined') return fresh
-
-  try {
-    const stored = window.localStorage.getItem(DEMO_STORAGE_KEY)
-    if (!stored) return fresh
-    const parsed = JSON.parse(stored)
-    if (!workspaceLooksUsable(parsed)) return fresh
-    return recalculateWorkspace({ ...parsed, demo: true })
-  } catch {
-    return fresh
-  }
-}
-
-function persistDemoWorkspace(workspace: CrmWorkspacePayload | null) {
-  if (!workspace?.demo || typeof window === 'undefined') return
-
-  try {
-    window.localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(workspace))
-  } catch {
-    // Local storage is best-effort for the unauthenticated demo workspace.
-  }
-}
-
 function collectLabels(text: string, rules: Array<{ label: string; terms: string[] }>) {
   return rules
     .filter(rule => rule.terms.some(term => text.includes(term)))
@@ -344,7 +313,6 @@ export default function SalesCommandCenter() {
   const [error, setError] = useState<string | null>(null)
 
   const setWorkspace = useCallback((next: CrmWorkspacePayload | null) => {
-    persistDemoWorkspace(next)
     setPayload(next)
   }, [])
 
@@ -352,7 +320,6 @@ export default function SalesCommandCenter() {
     setPayload(previous => {
       if (!previous) return previous
       const next = updater(previous)
-      persistDemoWorkspace(next)
       return next
     })
   }
@@ -361,8 +328,7 @@ export default function SalesCommandCenter() {
     setLoading(true)
     setError(null)
     try {
-      const data = await jsonFetch<CrmWorkspacePayload>('/api/crm/workspace')
-      const workspace = hydrateDemoWorkspace(data)
+      const workspace = await jsonFetch<CrmWorkspacePayload>('/api/crm/workspace')
       setWorkspace(workspace)
       setActiveLeadId(previous => previous && workspace.leads.some(lead => lead.id === previous) ? previous : workspace.leads[0]?.id ?? null)
       setChannelId(workspace.leads[0]?.channel ?? 'mail')

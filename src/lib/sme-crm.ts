@@ -836,3 +836,7 @@ export function getDemoCrmWorkspacePayload(): CrmWorkspacePayload {
     intelligence: buildRecoveryIntelligence({ records: leads, tasks, activities }),
   }
 }
+
+export function getSeedCrmWorkspacePayload(): CrmWorkspacePayload {
+  return { ...getDemoCrmWorkspacePayload(), demo: undefined }
+}

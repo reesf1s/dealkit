@@ -86,6 +86,32 @@ CREATE TABLE IF NOT EXISTS crm_ai_actions (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+DO $$ BEGIN
+  ALTER TYPE crm_task_priority ADD VALUE IF NOT EXISTS 'medium';
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TYPE crm_activity_type ADD VALUE IF NOT EXISTS 'engagement';
+  ALTER TYPE crm_activity_type ADD VALUE IF NOT EXISTS 'reply';
+  ALTER TYPE crm_activity_type ADD VALUE IF NOT EXISTS 'follow_up';
+  ALTER TYPE crm_activity_type ADD VALUE IF NOT EXISTS 'call_signal';
+  ALTER TYPE crm_activity_type ADD VALUE IF NOT EXISTS 'intent';
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+END $$;
+
+ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS lead_id uuid REFERENCES crm_leads(id) ON DELETE CASCADE;
+ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS company_name text;
+ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS person_name text;
+ALTER TABLE crm_tasks ALTER COLUMN description SET DEFAULT '';
+
+ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS lead_id uuid REFERENCES crm_leads(id) ON DELETE CASCADE;
+ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS company_name text;
+ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS person_name text;
+ALTER TABLE crm_activities ALTER COLUMN body SET DEFAULT '';
+
 CREATE INDEX IF NOT EXISTS idx_crm_leads_workspace_updated ON crm_leads (workspace_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_crm_leads_workspace_stage ON crm_leads (workspace_id, stage);
 CREATE INDEX IF NOT EXISTS idx_crm_channels_workspace ON crm_channels (workspace_id);
