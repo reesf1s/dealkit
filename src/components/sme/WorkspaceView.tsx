@@ -1327,89 +1327,296 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 function AccountsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const accounts = useAccounts(workspace)
   const [query, setQuery] = useState('')
-  const [riskFilter, setRiskFilter] = useState<'all' | CrmLeadDto['risk']>('all')
-  const filteredAccounts = accounts.filter(account => {
-    const matchesRisk = riskFilter === 'all' || account.risk === riskFilter
-    const matchesQuery = `${account.companyName} ${account.primaryPersonName} ${account.owner} ${account.stage}`.toLowerCase().includes(query.toLowerCase())
-    return matchesRisk && matchesQuery
+  const [segment, setSegment] = useState<'all' | 'at-risk' | 'active' | 'quiet'>('all')
+  const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id ?? '')
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskBusy, setTaskBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!accounts.length) return
+    if (!accounts.some(account => account.id === selectedAccountId)) setSelectedAccountId(accounts[0].id)
+  }, [accounts, selectedAccountId])
+
+  const accountRows = accounts.map(account => {
+    const lead = workspace.leads.find(candidate => candidate.id === account.id)
+    const tasks = workspace.tasks.filter(task => task.companyName === account.companyName || task.personName === account.primaryPersonName)
+    const messages = lead ? leadMessages(workspace, lead.id) : []
+    const activities = workspace.activities
+      .filter(activity => activity.companyName === account.companyName || activity.personName === account.primaryPersonName)
+      .sort((a, b) => new Date(b.occurredAt ?? 0).getTime() - new Date(a.occurredAt ?? 0).getTime())
+    const latestTime = account.latestAt ? new Date(account.latestAt).getTime() : 0
+    const quiet = !latestTime || Date.now() - latestTime > 14 * 86_400_000
+    const coverage = Math.min(100, account.messages * 12 + account.activities * 16 + Math.max(0, 100 - account.openTasks * 12))
+    const health = Math.max(12, Math.min(98, Math.round(coverage - (account.risk === 'hot' ? 24 : 0) - (quiet ? 18 : 0) + account.probability / 4)))
+
+    return {
+      ...account,
+      lead,
+      tasks,
+      messages,
+      activities,
+      quiet,
+      health,
+    }
   })
+
+  const filteredAccounts = accountRows.filter(account => {
+    const matchesSegment =
+      segment === 'all' ||
+      (segment === 'at-risk' && (account.risk === 'hot' || account.probability < 45)) ||
+      (segment === 'active' && !account.quiet && account.messages.length + account.activities.length > 0) ||
+      (segment === 'quiet' && account.quiet)
+    const matchesQuery = `${account.companyName} ${account.primaryPersonName} ${account.owner} ${account.stage}`.toLowerCase().includes(query.toLowerCase())
+    return matchesSegment && matchesQuery
+  })
+  const selectedAccount = accountRows.find(account => account.id === selectedAccountId) ?? accountRows[0]
+  const accountValue = accounts.reduce((sum, account) => sum + account.valueAmount, 0)
+  const quietAccounts = accountRows.filter(account => account.quiet).length
+  const riskyAccounts = accountRows.filter(account => account.risk === 'hot' || account.health < 55).length
+  const buyingCommittee = selectedAccount
+    ? [...new Set([
+      selectedAccount.primaryPersonName,
+      ...selectedAccount.activities.map(activity => activity.personName),
+    ].filter(Boolean))]
+    : []
+  const selectedTimeline = selectedAccount
+    ? [
+      ...selectedAccount.messages.map(message => ({
+        id: `message-${message.id}`,
+        type: channelLabel(message.channel),
+        title: message.from === 'customer' ? 'Customer message' : message.from === 'ai' ? 'AI draft' : 'Rep message',
+        detail: message.text,
+        at: message.sentAt,
+      })),
+      ...selectedAccount.activities.map(activity => ({
+        id: `activity-${activity.id}`,
+        type: activity.type,
+        title: activity.title,
+        detail: activity.body,
+        at: activity.occurredAt,
+      })),
+    ].sort((a, b) => new Date(b.at ?? 0).getTime() - new Date(a.at ?? 0).getTime()).slice(0, 5)
+    : []
+
+  async function createAccountTask() {
+    if (!selectedAccount || !taskTitle.trim()) return
+    setTaskBusy(true)
+    setNotice(null)
+    try {
+      await apiJson('/api/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: selectedAccount.id,
+          title: taskTitle,
+          description: `Account follow-up for ${selectedAccount.companyName}`,
+          priority: selectedAccount.risk === 'hot' || selectedAccount.quiet ? 'high' : 'medium',
+          companyName: selectedAccount.companyName,
+          personName: selectedAccount.primaryPersonName,
+        }),
+      })
+      setTaskTitle('')
+      setNotice('Account task created')
+      await actions.refresh()
+    } finally {
+      setTaskBusy(false)
+    }
+  }
 
   return (
     <section className="grid gap-4">
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard label="Accounts" value={`${accounts.length}`} detail="Companies with open commercial motion." icon={Building2} />
-        <StatCard label="Contacts" value={`${new Set(accounts.map(account => account.primaryPersonName)).size}`} detail="Primary buyer contacts on active deals." icon={MessageCircle} />
-        <StatCard label="Weighted value" value={money(accounts.reduce((sum, account) => sum + account.weightedValue, 0))} detail="Forecast-weighted account value." icon={Gauge} />
-        <StatCard label="Open work" value={`${accounts.reduce((sum, account) => sum + account.openTasks, 0)}`} detail="Tasks connected to active accounts." icon={ClipboardList} />
+        <StatCard label="Accounts" value={`${accounts.length}`} detail={`${riskyAccounts} need account team attention.`} icon={Building2} />
+        <StatCard label="Relationship map" value={`${new Set(accounts.map(account => account.primaryPersonName)).size}`} detail="Known primary contacts across open accounts." icon={Users} />
+        <StatCard label="Account value" value={money(accountValue)} detail={money(accounts.reduce((sum, account) => sum + account.weightedValue, 0)) + ' weighted.'} icon={Gauge} />
+        <StatCard label="Quiet accounts" value={`${quietAccounts}`} detail="No meaningful touch in the last 14 days." icon={CalendarClock} />
       </div>
 
-      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-        <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <CardTitle>Accounts and contacts</CardTitle>
-            <CardDescription>HubSpot-style account coverage: who owns it, who matters, what is open, and when it moved.</CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Input
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-              placeholder="Search accounts..."
-              className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
-            />
-            <select
-              value={riskFilter}
-              onChange={event => setRiskFilter(event.target.value as 'all' | CrmLeadDto['risk'])}
-              className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none"
-            >
-              <option value="all">All risk</option>
-              <option value="hot">Hot</option>
-              <option value="warm">Warm</option>
-              <option value="new">New</option>
-            </select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-white/10 hover:bg-transparent">
-                <TableHead className="text-zinc-500">Account</TableHead>
-                <TableHead className="text-zinc-500">Primary contact</TableHead>
-                <TableHead className="text-zinc-500">Owner</TableHead>
-                <TableHead className="text-zinc-500">Stage</TableHead>
-                <TableHead className="text-zinc-500">Engagement</TableHead>
-                <TableHead className="text-zinc-500">Weighted</TableHead>
-                <TableHead className="text-zinc-500">Last touch</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAccounts.map(account => (
-                <TableRow key={account.id} className="border-white/8 hover:bg-white/[0.04]">
-                  <TableCell>
-                    <button type="button" onClick={() => actions.selectLead(account.id)} className="flex items-center gap-3 text-left">
-                      <DealAvatar value={account.companyName} />
-                      <div>
-                        <p className="font-medium text-white">{account.companyName}</p>
-                        <p className="text-xs text-zinc-500">{channelLabel(account.channel)}</p>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid gap-4">
+          <Card className={cn(pillSurfaceClass, 'overflow-hidden bg-[#101316]')}>
+            <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <CardTitle>Account cockpit</CardTitle>
+                <CardDescription>Segment the book by relationship health, account risk, and recent evidence.</CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder="Search accounts..."
+                  className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
+                />
+                <select
+                  value={segment}
+                  onChange={event => setSegment(event.target.value as typeof segment)}
+                  className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none"
+                >
+                  <option value="all">All accounts</option>
+                  <option value="at-risk">At risk</option>
+                  <option value="active">Active</option>
+                  <option value="quiet">Quiet</option>
+                </select>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {filteredAccounts.map(account => {
+                const ChannelIcon = CHANNEL_ICONS[account.channel]
+                const selected = account.id === selectedAccount?.id
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => setSelectedAccountId(account.id)}
+                    className={cn(
+                      pillInsetClass,
+                      'grid gap-4 p-4 text-left transition md:grid-cols-[minmax(0,1fr)_210px]',
+                      selected ? 'border-blue-300/30 bg-blue-400/10' : 'hover:bg-white/[0.04]',
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DealAvatar value={account.companyName} />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-white">{account.companyName}</p>
+                          <p className="truncate text-xs text-zinc-500">{account.primaryPersonName} · {account.owner}</p>
+                        </div>
+                        <Badge variant="outline" className={riskTone(account.risk)}>{account.risk}</Badge>
+                        {account.quiet ? <Badge variant="outline" className="border-yellow-300/25 bg-yellow-300/10 text-yellow-100">quiet</Badge> : null}
                       </div>
-                    </button>
-                  </TableCell>
-                  <TableCell className="text-zinc-300">{account.primaryPersonName}</TableCell>
-                  <TableCell className="text-zinc-400">{account.owner}</TableCell>
-                  <TableCell className="text-zinc-300">{account.stage}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{account.messages} msgs</Badge>
-                      <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{account.openTasks} tasks</Badge>
+                      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_110px] md:items-center">
+                        <div>
+                          <div className="mb-2 flex items-center justify-between text-xs">
+                            <span className="text-zinc-500">Relationship health</span>
+                            <span className="font-medium text-zinc-200">{account.health}%</span>
+                          </div>
+                          <Progress value={account.health} className="h-2 bg-white/10" />
+                        </div>
+                        <p className="text-right text-sm font-semibold text-white">{money(account.valueAmount)}</p>
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-zinc-300">{money(account.weightedValue)}</TableCell>
-                  <TableCell className="text-zinc-500">{daysAgo(account.latestAt)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    <div className="grid grid-cols-3 gap-2 text-xs md:grid-cols-1">
+                      <span className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-zinc-300">{account.stage}</span>
+                      <span className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-zinc-300">{account.messages.length} messages</span>
+                      <span className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-zinc-300">
+                        <ChannelIcon className="mr-1 inline size-3" />
+                        {daysAgo(account.latestAt)}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </CardContent>
+          </Card>
+
+          {selectedAccount ? (
+            <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+              <CardHeader className="gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle>Buying committee</CardTitle>
+                  <CardDescription>People seen in messages and logged activity for the selected account.</CardDescription>
+                </div>
+                <Button type="button" variant="outline" onClick={() => actions.selectLead(selectedAccount.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                  Open deal
+                  <ArrowUpRight className="size-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {buyingCommittee.map(person => (
+                  <div key={person} className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-center gap-3">
+                      <DealAvatar value={person} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{person}</p>
+                        <p className="text-xs text-zinc-500">{person === selectedAccount.primaryPersonName ? 'Primary buyer' : 'Engaged stakeholder'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {!buyingCommittee.length ? <p className="text-sm text-zinc-500">No contacts captured yet.</p> : null}
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+
+        <aside className="grid h-fit gap-4">
+          {selectedAccount ? (
+            <>
+              <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>{selectedAccount.companyName}</CardTitle>
+                      <CardDescription>{selectedAccount.stage} · {money(selectedAccount.weightedValue)} weighted</CardDescription>
+                    </div>
+                    <Badge variant="outline" className={riskTone(selectedAccount.risk)}>{selectedAccount.risk}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Probability</p>
+                      <p className="mt-1 font-semibold text-white">{selectedAccount.probability}%</p>
+                    </div>
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Open work</p>
+                      <p className="mt-1 font-semibold text-white">{selectedAccount.openTasks} tasks</p>
+                    </div>
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Last touch</p>
+                      <p className="mt-1 font-semibold text-white">{daysAgo(selectedAccount.latestAt)}</p>
+                    </div>
+                    <div className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-zinc-500">Close</p>
+                      <p className="mt-1 font-semibold text-white">{shortDate(selectedAccount.lead?.expectedCloseDate)}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Next account move</p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-200">{selectedAccount.lead?.nextStep || 'Add a next step to keep the account moving.'}</p>
+                  </div>
+
+                  {notice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{notice}</div> : null}
+                  <div className="flex gap-2">
+                    <Input
+                      value={taskTitle}
+                      onChange={event => setTaskTitle(event.target.value)}
+                      placeholder="Create account task..."
+                      className="h-10 rounded-full border-white/10 bg-black/20 text-white placeholder:text-zinc-600"
+                    />
+                    <Button type="button" onClick={() => void createAccountTask()} disabled={taskBusy || !taskTitle.trim()} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                      <Plus className="size-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+                <CardHeader>
+                  <CardTitle>Recent evidence</CardTitle>
+                  <CardDescription>Latest account activity, messages, and logged sales notes.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3">
+                  {selectedTimeline.map(item => (
+                    <div key={item.id} className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{item.type}</Badge>
+                        <span className="text-xs text-zinc-500">{daysAgo(item.at)}</span>
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-white">{item.title}</p>
+                      <p className="mt-1 line-clamp-3 text-sm leading-6 text-zinc-400">{item.detail}</p>
+                    </div>
+                  ))}
+                  {!selectedTimeline.length ? <p className="text-sm text-zinc-500">No evidence captured yet.</p> : null}
+                </CardContent>
+              </Card>
+
+              <ActivityComposer workspace={workspace} actions={actions} defaultLeadId={selectedAccount.id} compact />
+            </>
+          ) : null}
+        </aside>
+      </div>
     </section>
   )
 }
