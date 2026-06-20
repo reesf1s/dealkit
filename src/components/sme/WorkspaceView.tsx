@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ArrowUpRight,
   Bot,
+  Building2,
   CalendarClock,
   CheckCircle2,
   ClipboardList,
@@ -38,7 +39,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { pillInsetClass, pillSurfaceClass } from '@/components/sme/halvex-system'
 import { cn } from '@/lib/utils'
 
-type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'forecast' | 'coach' | 'channels'
+type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'forecast' | 'coach' | 'channels'
 
 type WorkspaceAction = {
   selectLead: (leadId: string) => void
@@ -80,6 +81,16 @@ const VIEW_COPY: Record<WorkspaceViewName, { eyebrow: string; title: string; des
     eyebrow: 'Pipeline',
     title: 'Deals',
     description: 'A tabular view for scanning accounts, probability, value, risk, and next steps.',
+  },
+  accounts: {
+    eyebrow: 'Accounts',
+    title: 'Account directory',
+    description: 'Company and contact coverage tied to pipeline value, engagement, and open work.',
+  },
+  tasks: {
+    eyebrow: 'Execution',
+    title: 'Task queue',
+    description: 'The rep workbench for follow-ups, next steps, due work, and deal-linked activity.',
   },
   forecast: {
     eyebrow: 'Forecast',
@@ -178,6 +189,38 @@ function leadMessages(workspace: CrmWorkspacePayload, leadId: string) {
     .flat()
     .filter(message => message.leadId === leadId)
     .sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+}
+
+function useAccounts(workspace: CrmWorkspacePayload) {
+  return useMemo(() => {
+    return workspace.leads.map(lead => {
+      const messages = leadMessages(workspace, lead.id)
+      const tasks = workspace.tasks.filter(task => task.companyName === lead.companyName || task.personName === lead.primaryPersonName)
+      const activities = workspace.activities.filter(activity => activity.companyName === lead.companyName || activity.personName === lead.primaryPersonName)
+      const latestDates = [
+        lead.latestActivityAt,
+        ...messages.map(message => message.sentAt),
+        ...activities.map(activity => activity.occurredAt),
+      ].filter(Boolean).map(value => new Date(value as string | Date).getTime()).filter(Number.isFinite)
+
+      return {
+        id: lead.id,
+        companyName: lead.companyName ?? lead.title ?? 'Untitled account',
+        primaryPersonName: lead.primaryPersonName ?? 'Primary contact',
+        owner: lead.owner,
+        stage: lead.stageName || lead.stage || 'New',
+        valueAmount: Number(lead.valueAmount ?? 0),
+        probability: Number(lead.probability ?? 0),
+        weightedValue: Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100),
+        risk: lead.risk,
+        channel: lead.channel,
+        openTasks: tasks.length,
+        messages: messages.length,
+        activities: activities.length,
+        latestAt: latestDates.length ? new Date(Math.max(...latestDates)).toISOString() : lead.latestActivityAt,
+      }
+    }).sort((a, b) => b.weightedValue - a.weightedValue)
+  }, [workspace])
 }
 
 function PageHeader({ view }: { view: WorkspaceViewName }) {
@@ -526,9 +569,231 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
   )
 }
 
-function ForecastView({ workspace }: { workspace: CrmWorkspacePayload }) {
+function AccountsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const accounts = useAccounts(workspace)
+  const [query, setQuery] = useState('')
+  const [riskFilter, setRiskFilter] = useState<'all' | CrmLeadDto['risk']>('all')
+  const filteredAccounts = accounts.filter(account => {
+    const matchesRisk = riskFilter === 'all' || account.risk === riskFilter
+    const matchesQuery = `${account.companyName} ${account.primaryPersonName} ${account.owner} ${account.stage}`.toLowerCase().includes(query.toLowerCase())
+    return matchesRisk && matchesQuery
+  })
+
+  return (
+    <section className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Accounts" value={`${accounts.length}`} detail="Companies with open commercial motion." icon={Building2} />
+        <StatCard label="Contacts" value={`${new Set(accounts.map(account => account.primaryPersonName)).size}`} detail="Primary buyer contacts on active deals." icon={MessageCircle} />
+        <StatCard label="Weighted value" value={money(accounts.reduce((sum, account) => sum + account.weightedValue, 0))} detail="Forecast-weighted account value." icon={Gauge} />
+        <StatCard label="Open work" value={`${accounts.reduce((sum, account) => sum + account.openTasks, 0)}`} detail="Tasks connected to active accounts." icon={ClipboardList} />
+      </div>
+
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <CardTitle>Accounts and contacts</CardTitle>
+            <CardDescription>HubSpot-style account coverage: who owns it, who matters, what is open, and when it moved.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Search accounts..."
+              className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
+            />
+            <select
+              value={riskFilter}
+              onChange={event => setRiskFilter(event.target.value as 'all' | CrmLeadDto['risk'])}
+              className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none"
+            >
+              <option value="all">All risk</option>
+              <option value="hot">Hot</option>
+              <option value="warm">Warm</option>
+              <option value="new">New</option>
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="text-zinc-500">Account</TableHead>
+                <TableHead className="text-zinc-500">Primary contact</TableHead>
+                <TableHead className="text-zinc-500">Owner</TableHead>
+                <TableHead className="text-zinc-500">Stage</TableHead>
+                <TableHead className="text-zinc-500">Engagement</TableHead>
+                <TableHead className="text-zinc-500">Weighted</TableHead>
+                <TableHead className="text-zinc-500">Last touch</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAccounts.map(account => (
+                <TableRow key={account.id} className="border-white/8 hover:bg-white/[0.04]">
+                  <TableCell>
+                    <button type="button" onClick={() => actions.selectLead(account.id)} className="flex items-center gap-3 text-left">
+                      <DealAvatar value={account.companyName} />
+                      <div>
+                        <p className="font-medium text-white">{account.companyName}</p>
+                        <p className="text-xs text-zinc-500">{channelLabel(account.channel)}</p>
+                      </div>
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-zinc-300">{account.primaryPersonName}</TableCell>
+                  <TableCell className="text-zinc-400">{account.owner}</TableCell>
+                  <TableCell className="text-zinc-300">{account.stage}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{account.messages} msgs</Badge>
+                      <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{account.openTasks} tasks</Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-zinc-300">{money(account.weightedValue)}</TableCell>
+                  <TableCell className="text-zinc-500">{daysAgo(account.latestAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+
+function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const [query, setQuery] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [leadId, setLeadId] = useState(workspace.leads[0]?.id ?? '')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const leadByCompany = new Map(workspace.leads.map(lead => [lead.companyName, lead]))
+  const sortedTasks = [...workspace.tasks].sort((a, b) => new Date(a.dueAt ?? 0).getTime() - new Date(b.dueAt ?? 0).getTime())
+  const filteredTasks = sortedTasks.filter(task => {
+    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
+    const matchesQuery = `${task.title} ${task.description} ${task.companyName} ${task.personName}`.toLowerCase().includes(query.toLowerCase())
+    return matchesPriority && matchesQuery
+  })
+  const overdue = sortedTasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() < Date.now()).length
+  const high = sortedTasks.filter(task => task.priority === 'high').length
+
+  async function createQueueTask() {
+    if (!title.trim()) return
+    const lead = workspace.leads.find(candidate => candidate.id === leadId)
+    setBusy(true)
+    setNotice(null)
+    try {
+      await apiJson('/api/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId,
+          title,
+          description,
+          priority: lead?.risk === 'hot' ? 'high' : 'medium',
+          companyName: lead?.companyName,
+          personName: lead?.primaryPersonName,
+        }),
+      })
+      setTitle('')
+      setDescription('')
+      setNotice('Task created')
+      await actions.refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatCard label="Open tasks" value={`${sortedTasks.length}`} detail="All current rep work items." icon={ClipboardList} />
+          <StatCard label="High priority" value={`${high}`} detail="Work tied to hot or late-stage deals." icon={ShieldAlert} />
+          <StatCard label="Due now" value={`${overdue}`} detail="Past-due or due-today follow-up pressure." icon={CalendarClock} />
+        </div>
+
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <CardTitle>Rep work queue</CardTitle>
+              <CardDescription>Every task stays connected to the account and the deal record.</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                placeholder="Search tasks..."
+                className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
+              />
+              <select value={priorityFilter} onChange={event => setPriorityFilter(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+                <option value="all">All priority</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {filteredTasks.map(task => {
+              const lead = task.companyName ? leadByCompany.get(task.companyName) : undefined
+              return (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => lead ? actions.selectLead(lead.id) : undefined}
+                  className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[minmax(0,1fr)_auto] md:items-center')}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-white">{task.title}</p>
+                      <Badge variant="outline" className={task.priority === 'high' ? 'border-red-400/25 bg-red-400/10 text-red-100' : 'border-white/10 bg-white/[0.04] text-zinc-300'}>
+                        {task.priority ?? 'medium'}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-500">{task.companyName ?? 'No account'} · {task.personName ?? 'No contact'}</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300">{task.description}</p>
+                  </div>
+                  <div className="text-right text-xs text-zinc-500">
+                    <p>Due {shortDate(task.dueAt)}</p>
+                    {lead ? <p className="mt-2 text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</p> : null}
+                  </div>
+                </button>
+              )
+            })}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className={cn(pillSurfaceClass, 'h-fit bg-[#101316]')}>
+        <CardHeader>
+          <CardTitle>Create task</CardTitle>
+          <CardDescription>Add a next action against an active deal.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {notice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{notice}</div> : null}
+          <select value={leadId} onChange={event => setLeadId(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+            {workspace.leads.map(lead => <option key={lead.id} value={lead.id}>{lead.companyName}</option>)}
+          </select>
+          <Input value={title} onChange={event => setTitle(event.target.value)} placeholder="Task title" className="rounded-full border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
+          <Textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Task detail..." className="min-h-28 rounded-[22px] border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
+          <Button type="button" onClick={() => void createQueueTask()} disabled={busy || !title.trim()} className="rounded-full bg-white text-black hover:bg-zinc-200">
+            <Plus className="size-4" />
+            {busy ? 'Creating...' : 'Create task'}
+          </Button>
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+
+function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const metrics = useWorkspaceMetrics(workspace)
   const maxValue = Math.max(...metrics.stages.map(stage => stage.value), 1)
+  const commit = workspace.leads.filter(lead => Number(lead.probability ?? 0) >= 70)
+  const bestCase = workspace.leads.filter(lead => Number(lead.probability ?? 0) >= 45 && Number(lead.probability ?? 0) < 70)
+  const pipeline = workspace.leads.filter(lead => Number(lead.probability ?? 0) < 45)
+  const bandValue = (leads: CrmLeadDto[]) => leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
 
   return (
     <div className="grid gap-4">
@@ -536,6 +801,11 @@ function ForecastView({ workspace }: { workspace: CrmWorkspacePayload }) {
         <StatCard label="Total pipeline" value={money(metrics.total)} detail="All open value." icon={TrendingUp} />
         <StatCard label="Weighted" value={money(Math.round(metrics.weighted))} detail="Probability adjusted." icon={Gauge} />
         <StatCard label="Open tasks" value={`${metrics.tasks}`} detail="Execution work tied to deals." icon={CheckCircle2} />
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard label="Commit" value={money(bandValue(commit))} detail={`${commit.length} deals at 70%+ probability.`} icon={CheckCircle2} />
+        <StatCard label="Best case" value={money(bandValue(bestCase))} detail={`${bestCase.length} deals that can still land.`} icon={ShieldAlert} />
+        <StatCard label="Pipeline" value={money(bandValue(pipeline))} detail={`${pipeline.length} early or weak-intent deals.`} icon={Gauge} />
       </div>
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader>
@@ -557,6 +827,50 @@ function ForecastView({ workspace }: { workspace: CrmWorkspacePayload }) {
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader>
+          <CardTitle>Forecast inspection</CardTitle>
+          <CardDescription>Deal-level forecast rows with risk, probability, close date, and the next action.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="text-zinc-500">Deal</TableHead>
+                <TableHead className="text-zinc-500">Category</TableHead>
+                <TableHead className="text-zinc-500">Value</TableHead>
+                <TableHead className="text-zinc-500">Weighted</TableHead>
+                <TableHead className="text-zinc-500">Close</TableHead>
+                <TableHead className="text-zinc-500">Next action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...workspace.leads].sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0)).map(lead => {
+                const probability = Number(lead.probability ?? 0)
+                const category = probability >= 70 ? 'Commit' : probability >= 45 ? 'Best case' : 'Pipeline'
+                return (
+                  <TableRow key={lead.id} className="border-white/8 hover:bg-white/[0.04]">
+                    <TableCell>
+                      <button type="button" onClick={() => actions.selectLead(lead.id)} className="flex items-center gap-3 text-left">
+                        <DealAvatar value={lead.companyName} />
+                        <div>
+                          <p className="font-medium text-white">{lead.companyName}</p>
+                          <p className="text-xs text-zinc-500">{lead.stageName}</p>
+                        </div>
+                      </button>
+                    </TableCell>
+                    <TableCell><Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{category}</Badge></TableCell>
+                    <TableCell className="text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</TableCell>
+                    <TableCell className="text-zinc-300">{money(Math.round((Number(lead.valueAmount ?? 0) * probability) / 100))}</TableCell>
+                    <TableCell className="text-zinc-500">{shortDate(lead.expectedCloseDate)}</TableCell>
+                    <TableCell className="max-w-md truncate text-zinc-400">{lead.nextStep}</TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>
@@ -1021,7 +1335,9 @@ export default function WorkspaceView({ view }: { view: WorkspaceViewName }) {
       {view === 'dashboard' ? <DashboardView workspace={workspace} actions={actions} /> : null}
       {view === 'inbox' ? <InboxView workspace={workspace} actions={actions} /> : null}
       {view === 'deals' ? <DealsView workspace={workspace} actions={actions} /> : null}
-      {view === 'forecast' ? <ForecastView workspace={workspace} /> : null}
+      {view === 'accounts' ? <AccountsView workspace={workspace} actions={actions} /> : null}
+      {view === 'tasks' ? <TasksView workspace={workspace} actions={actions} /> : null}
+      {view === 'forecast' ? <ForecastView workspace={workspace} actions={actions} /> : null}
       {view === 'coach' ? <CoachView workspace={workspace} actions={actions} /> : null}
       {view === 'channels' ? <ChannelsView workspace={workspace} actions={actions} /> : null}
       <DealDetailSheet
