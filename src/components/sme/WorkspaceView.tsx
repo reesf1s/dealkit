@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertCircle,
@@ -462,8 +462,8 @@ function useWorkspace() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function refresh() {
-    setLoading(true)
+  const refresh = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton) setLoading(true)
     setError(null)
     try {
       setWorkspace(await loadWorkspace())
@@ -472,11 +472,11 @@ function useWorkspace() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [])
+    void refresh(true)
+  }, [refresh])
 
   return { workspace, loading, error, refresh }
 }
@@ -1409,12 +1409,38 @@ function TeamView({ workspace, actions }: { workspace: CrmWorkspacePayload; acti
 }
 
 function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const [busyLeadId, setBusyLeadId] = useState<string | null>(null)
+  const [forecastNotice, setForecastNotice] = useState<string | null>(null)
   const metrics = useWorkspaceMetrics(workspace)
   const maxValue = Math.max(...metrics.stages.map(stage => stage.value), 1)
   const commit = workspace.leads.filter(lead => Number(lead.probability ?? 0) >= 70)
   const bestCase = workspace.leads.filter(lead => Number(lead.probability ?? 0) >= 45 && Number(lead.probability ?? 0) < 70)
   const pipeline = workspace.leads.filter(lead => Number(lead.probability ?? 0) < 45)
   const bandValue = (leads: CrmLeadDto[]) => leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+
+  async function patchForecast(lead: CrmLeadDto, data: Partial<{ stage: string; status: string; probability: number; risk: CrmLeadDto['risk'] }>) {
+    setBusyLeadId(lead.id)
+    setForecastNotice(null)
+    try {
+      await apiJson(`/api/crm/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          companyName: lead.companyName,
+          primaryPersonName: lead.primaryPersonName,
+          owner: lead.owner,
+          valueAmount: Number(lead.valueAmount ?? 0),
+          channel: lead.channel,
+          nextStep: lead.nextStep,
+          description: lead.description,
+          ...data,
+        }),
+      })
+      setForecastNotice(`${lead.companyName} moved to ${data.stage ?? 'updated forecast'}`)
+      await actions.refresh()
+    } finally {
+      setBusyLeadId(null)
+    }
+  }
 
   return (
     <div className="grid gap-4">
@@ -1452,46 +1478,74 @@ function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
       </Card>
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader>
-          <CardTitle>Forecast inspection</CardTitle>
-          <CardDescription>Deal-level forecast rows with risk, probability, close date, and the next action.</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Forecast inspection</CardTitle>
+              <CardDescription>Deal-level forecast rows with manager controls for commit, upside, pipeline, won, and lost.</CardDescription>
+            </div>
+            {forecastNotice ? <Badge variant="outline" className="rounded-full border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-emerald-100">{forecastNotice}</Badge> : null}
+          </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-white/10 hover:bg-transparent">
-                <TableHead className="text-zinc-500">Deal</TableHead>
-                <TableHead className="text-zinc-500">Category</TableHead>
-                <TableHead className="text-zinc-500">Value</TableHead>
-                <TableHead className="text-zinc-500">Weighted</TableHead>
-                <TableHead className="text-zinc-500">Close</TableHead>
-                <TableHead className="text-zinc-500">Next action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...workspace.leads].sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0)).map(lead => {
-                const probability = Number(lead.probability ?? 0)
-                const category = probability >= 70 ? 'Commit' : probability >= 45 ? 'Best case' : 'Pipeline'
-                return (
-                  <TableRow key={lead.id} className="border-white/8 hover:bg-white/[0.04]">
-                    <TableCell>
-                      <button type="button" onClick={() => actions.selectLead(lead.id)} className="flex items-center gap-3 text-left">
-                        <DealAvatar value={lead.companyName} />
-                        <div>
-                          <p className="font-medium text-white">{lead.companyName}</p>
-                          <p className="text-xs text-zinc-500">{lead.stageName}</p>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="text-zinc-500">Deal</TableHead>
+                  <TableHead className="text-zinc-500">Category</TableHead>
+                  <TableHead className="text-zinc-500">Value</TableHead>
+                  <TableHead className="text-zinc-500">Weighted</TableHead>
+                  <TableHead className="text-zinc-500">Close</TableHead>
+                  <TableHead className="text-zinc-500">Next action</TableHead>
+                  <TableHead className="min-w-[300px] text-zinc-500">Manage</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...workspace.leads].sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0)).map(lead => {
+                  const probability = Number(lead.probability ?? 0)
+                  const category = probability >= 70 ? 'Commit' : probability >= 45 ? 'Best case' : 'Pipeline'
+                  const isClosed = lead.status === 'won' || lead.status === 'lost'
+                  return (
+                    <TableRow key={lead.id} className="border-white/8 hover:bg-white/[0.04]">
+                      <TableCell>
+                        <button type="button" onClick={() => actions.selectLead(lead.id)} className="flex min-w-64 items-center gap-3 text-left">
+                          <DealAvatar value={lead.companyName} />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-white">{lead.companyName}</p>
+                            <p className="truncate text-xs text-zinc-500">{lead.stageName}</p>
+                          </div>
+                        </button>
+                      </TableCell>
+                      <TableCell><Badge variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-300">{lead.status === 'won' ? 'Won' : lead.status === 'lost' ? 'Lost' : category}</Badge></TableCell>
+                      <TableCell className="text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</TableCell>
+                      <TableCell className="text-zinc-300">{money(Math.round((Number(lead.valueAmount ?? 0) * probability) / 100))}</TableCell>
+                      <TableCell className="text-zinc-500">{shortDate(lead.expectedCloseDate)}</TableCell>
+                      <TableCell className="max-w-sm truncate text-zinc-400">{lead.nextStep}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant="outline" disabled={busyLeadId === lead.id || (category === 'Commit' && !isClosed)} onClick={() => void patchForecast(lead, { stage: 'Commit', status: 'qualified', probability: 80, risk: lead.risk === 'hot' ? 'hot' : 'warm' })} className="h-8 rounded-full border-emerald-300/20 bg-emerald-300/10 px-3 text-xs text-emerald-100 hover:bg-emerald-300/15">
+                            Commit
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" disabled={busyLeadId === lead.id || (category === 'Best case' && !isClosed)} onClick={() => void patchForecast(lead, { stage: 'Proposal', status: 'open', probability: 60, risk: 'warm' })} className="h-8 rounded-full border-blue-300/20 bg-blue-300/10 px-3 text-xs text-blue-100 hover:bg-blue-300/15">
+                            Best case
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" disabled={busyLeadId === lead.id || (category === 'Pipeline' && !isClosed)} onClick={() => void patchForecast(lead, { stage: 'Discovery', status: 'open', probability: 35, risk: 'new' })} className="h-8 rounded-full border-white/10 bg-white/[0.04] px-3 text-xs text-zinc-200 hover:bg-white/[0.08]">
+                            Pipeline
+                          </Button>
+                          <Button type="button" size="sm" disabled={busyLeadId === lead.id || lead.status === 'won'} onClick={() => void patchForecast(lead, { stage: 'Closed Won', status: 'won', probability: 100, risk: 'hot' })} className="h-8 rounded-full bg-white px-3 text-xs text-black hover:bg-zinc-200">
+                            Won
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" disabled={busyLeadId === lead.id || lead.status === 'lost'} onClick={() => void patchForecast(lead, { stage: 'Closed Lost', status: 'lost', probability: 0, risk: 'new' })} className="h-8 rounded-full border-red-300/20 bg-red-300/10 px-3 text-xs text-red-100 hover:bg-red-300/15">
+                            Lost
+                          </Button>
                         </div>
-                      </button>
-                    </TableCell>
-                    <TableCell><Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{category}</Badge></TableCell>
-                    <TableCell className="text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</TableCell>
-                    <TableCell className="text-zinc-300">{money(Math.round((Number(lead.valueAmount ?? 0) * probability) / 100))}</TableCell>
-                    <TableCell className="text-zinc-500">{shortDate(lead.expectedCloseDate)}</TableCell>
-                    <TableCell className="max-w-md truncate text-zinc-400">{lead.nextStep}</TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { getCrmWorkspacePayload, getDemoCrmWorkspacePayload } from '@/lib/sme-crm'
+import { getCrmWorkspacePayload, getDemoCrmWorkspacePayload, getDemoCrmWorkspaceState } from '@/lib/sme-crm'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 function csvCell(value: unknown) {
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     let workspace: Awaited<ReturnType<typeof getCrmWorkspacePayload>>
 
     if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
-      workspace = getDemoCrmWorkspacePayload()
+      workspace = getDemoCrmWorkspaceState()
     } else {
       const { userId } = await auth()
       if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -3,12 +3,14 @@ export const dynamic = 'force-dynamic'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { ensureCrmSeeded, getCrmWorkspacePayload, getSeedCrmWorkspacePayload } from '@/lib/sme-crm'
+import { ensureCrmSeeded, getCrmWorkspacePayload, getDemoCrmWorkspaceState, getSeedCrmWorkspacePayload } from '@/lib/sme-crm'
 
 export async function GET() {
   try {
     if (process.env.NODE_ENV !== 'production' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
-      return NextResponse.json(getSeedCrmWorkspacePayload())
+      return NextResponse.json(getDemoCrmWorkspaceState(), {
+        headers: { 'Cache-Control': 'no-store' },
+      })
     }
 
     const { userId } = await auth()

@@ -4,13 +4,13 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
 import { getDemoAuditEvents, getWorkspaceAuditEvents } from '@/lib/audit'
-import { getDemoCrmWorkspacePayload } from '@/lib/sme-crm'
+import { getDemoCrmWorkspaceState } from '@/lib/sme-crm'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 export async function GET() {
   try {
     if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
-      return NextResponse.json({ events: getDemoAuditEvents(getDemoCrmWorkspacePayload()) })
+      return NextResponse.json({ events: getDemoAuditEvents(getDemoCrmWorkspaceState()) })
     }
 
     const { userId } = await auth()
