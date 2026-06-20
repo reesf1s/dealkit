@@ -10,6 +10,7 @@ import {
   CheckSquare,
   CreditCard,
   Building2,
+  FileSpreadsheet,
   Home,
   MessagesSquare,
   PlugZap,
@@ -35,7 +36,7 @@ import { cn } from '@/lib/utils'
 type NavLink = {
   href: string
   label: string
-  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'reports' | 'coaching' | 'integrations' | 'settings' | 'billing'
+  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'reports' | 'import' | 'coaching' | 'integrations' | 'settings' | 'billing'
 }
 
 const navigation: NavLink[] = [
@@ -48,6 +49,7 @@ const navigation: NavLink[] = [
   { href: '/team', label: 'Team', icon: 'team' },
   { href: '/forecast', label: 'Forecast', icon: 'forecast' },
   { href: '/reports', label: 'Reports', icon: 'reports' },
+  { href: '/import', label: 'Import', icon: 'import' },
   { href: '/coach', label: 'AI coach', icon: 'coaching' },
   { href: '/channels', label: 'Channels', icon: 'integrations' },
 ]
@@ -78,6 +80,8 @@ function NavIcon({ icon }: { icon: NavLink['icon'] }) {
       return <BarChart3 {...props} />
     case 'reports':
       return <TrendingUp {...props} />
+    case 'import':
+      return <FileSpreadsheet {...props} />
     case 'coaching':
       return <Bot {...props} />
     case 'integrations':
