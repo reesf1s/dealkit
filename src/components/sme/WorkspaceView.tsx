@@ -50,6 +50,7 @@ type LeadFormState = {
   companyName: string
   primaryPersonName: string
   owner: string
+  status: string
   stage: string
   valueAmount: string
   probability: string
@@ -179,6 +180,7 @@ function leadFormState(lead: CrmLeadDto): LeadFormState {
     companyName: lead.companyName ?? lead.title ?? 'Untitled account',
     primaryPersonName: lead.primaryPersonName ?? 'Primary contact',
     owner: lead.owner ?? 'Sales owner',
+    status: lead.status ?? 'open',
     stage: lead.stageName || lead.stage || 'New',
     valueAmount: String(lead.valueAmount ?? 0),
     probability: String(lead.probability ?? 0),
@@ -452,79 +454,152 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
   const stages = ['All', ...new Set(workspace.leads.map(lead => lead.stageName || lead.stage))]
   const [stageFilter, setStageFilter] = useState('All')
   const [query, setQuery] = useState('')
+  const [busyLeadId, setBusyLeadId] = useState<string | null>(null)
   const filteredLeads = workspace.leads.filter(lead => {
     const matchesStage = stageFilter === 'All' || (lead.stageName || lead.stage) === stageFilter
     const matchesQuery = `${lead.companyName} ${lead.primaryPersonName} ${lead.owner} ${lead.nextStep}`.toLowerCase().includes(query.toLowerCase())
     return matchesStage && matchesQuery
   })
+  const pipelineStages = ['Discovery', 'Evaluation', 'Proposal', 'Negotiation', 'Commit']
+
+  async function patchLead(lead: CrmLeadDto, data: Partial<{ stage: string; status: string; probability: number; risk: CrmLeadDto['risk'] }>) {
+    setBusyLeadId(lead.id)
+    try {
+      await apiJson(`/api/crm/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          companyName: lead.companyName,
+          primaryPersonName: lead.primaryPersonName,
+          owner: lead.owner,
+          valueAmount: Number(lead.valueAmount ?? 0),
+          channel: lead.channel,
+          nextStep: lead.nextStep,
+          description: lead.description,
+          ...data,
+        }),
+      })
+      await actions.refresh()
+    } finally {
+      setBusyLeadId(null)
+    }
+  }
 
   return (
-    <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-      <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <CardTitle>Deal table</CardTitle>
-          <CardDescription>Built for scanning, editing, notes, next steps, and follow-up work.</CardDescription>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder="Search deals..."
-            className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
-          />
-          <select
-            value={stageFilter}
-            onChange={event => setStageFilter(event.target.value)}
-            className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none"
-          >
-            {stages.map(stage => <option key={stage} value={stage}>{stage}</option>)}
-          </select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-white/10 hover:bg-transparent">
-              <TableHead className="text-zinc-500">Account</TableHead>
-              <TableHead className="text-zinc-500">Stage</TableHead>
-              <TableHead className="text-zinc-500">Value</TableHead>
-              <TableHead className="text-zinc-500">Prob.</TableHead>
-              <TableHead className="text-zinc-500">Last</TableHead>
-              <TableHead className="text-zinc-500">Next step</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredLeads.map(lead => (
-              <TableRow key={lead.id} className="border-white/8 hover:bg-white/[0.04]">
-                <TableCell>
-                  <button type="button" onClick={() => actions.selectLead(lead.id)} className="flex items-center gap-3 text-left">
-                    <DealAvatar value={lead.companyName} />
-                    <div>
-                      <p className="font-medium text-white">{lead.companyName}</p>
-                      <p className="text-xs text-zinc-500">{lead.primaryPersonName}</p>
+    <div className="grid gap-4">
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader>
+          <CardTitle>Pipeline board</CardTitle>
+          <CardDescription>Move opportunities through the sales process and close outcomes without leaving the pipeline.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 xl:grid-cols-5">
+          {pipelineStages.map(stage => {
+            const stageLeads = workspace.leads.filter(lead => (lead.stageName || lead.stage) === stage && lead.status !== 'won' && lead.status !== 'lost')
+            return (
+              <div key={stage} className={cn(pillInsetClass, 'grid content-start gap-3 p-3')}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-white">{stage}</p>
+                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{stageLeads.length}</Badge>
+                </div>
+                {stageLeads.map(lead => {
+                  const currentIndex = pipelineStages.indexOf(stage)
+                  const nextStage = pipelineStages[Math.min(pipelineStages.length - 1, currentIndex + 1)]
+                  return (
+                    <div key={lead.id} className="rounded-[20px] border border-white/10 bg-black/20 p-3">
+                      <button type="button" onClick={() => actions.selectLead(lead.id)} className="block w-full text-left">
+                        <p className="truncate text-sm font-medium text-white">{lead.companyName}</p>
+                        <p className="mt-1 truncate text-xs text-zinc-500">{lead.primaryPersonName}</p>
+                      </button>
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-zinc-200">{money(Number(lead.valueAmount ?? 0))}</span>
+                        <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        <Button type="button" size="sm" variant="outline" disabled={busyLeadId === lead.id || nextStage === stage} onClick={() => void patchLead(lead, { stage: nextStage, probability: Math.min(90, Number(lead.probability ?? 0) + 10) })} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                          Move next
+                        </Button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button type="button" size="sm" disabled={busyLeadId === lead.id} onClick={() => void patchLead(lead, { status: 'won', stage: 'Closed Won', probability: 100, risk: 'hot' })} className="rounded-full bg-emerald-300 text-black hover:bg-emerald-200">Won</Button>
+                          <Button type="button" size="sm" variant="outline" disabled={busyLeadId === lead.id} onClick={() => void patchLead(lead, { status: 'lost', stage: 'Closed Lost', probability: 0, risk: 'new' })} className="rounded-full border-red-300/20 bg-red-300/10 text-red-100">Lost</Button>
+                        </div>
+                      </div>
                     </div>
-                  </button>
-                </TableCell>
-                <TableCell className="text-zinc-300">{lead.stageName}</TableCell>
-                <TableCell className="text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</TableCell>
-                <TableCell>
-                  <div className="flex min-w-28 items-center gap-2">
-                    <Progress value={Number(lead.probability ?? 0)} className="h-1.5" />
-                    <span className="w-9 text-xs text-zinc-500">{lead.probability}%</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-zinc-500">{daysAgo(lead.latestActivityAt)}</TableCell>
-                <TableCell>
-                  <button type="button" onClick={() => actions.selectLead(lead.id)} className="max-w-sm truncate text-left text-zinc-400 hover:text-white">
-                    {lead.nextStep}
-                  </button>
-                </TableCell>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <CardTitle>Deal table</CardTitle>
+            <CardDescription>Built for scanning, editing, notes, next steps, and follow-up work.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Search deals..."
+              className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
+            />
+            <select
+              value={stageFilter}
+              onChange={event => setStageFilter(event.target.value)}
+              className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none"
+            >
+              {stages.map(stage => <option key={stage} value={stage}>{stage}</option>)}
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="text-zinc-500">Account</TableHead>
+                <TableHead className="text-zinc-500">Stage</TableHead>
+                <TableHead className="text-zinc-500">Status</TableHead>
+                <TableHead className="text-zinc-500">Value</TableHead>
+                <TableHead className="text-zinc-500">Prob.</TableHead>
+                <TableHead className="text-zinc-500">Last</TableHead>
+                <TableHead className="text-zinc-500">Next step</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {filteredLeads.map(lead => (
+                <TableRow key={lead.id} className="border-white/8 hover:bg-white/[0.04]">
+                  <TableCell>
+                    <button type="button" onClick={() => actions.selectLead(lead.id)} className="flex items-center gap-3 text-left">
+                      <DealAvatar value={lead.companyName} />
+                      <div>
+                        <p className="font-medium text-white">{lead.companyName}</p>
+                        <p className="text-xs text-zinc-500">{lead.primaryPersonName}</p>
+                      </div>
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-zinc-300">{lead.stageName}</TableCell>
+                  <TableCell><Badge variant="outline" className={lead.status === 'won' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : lead.status === 'lost' ? 'border-red-300/20 bg-red-300/10 text-red-100' : 'border-white/10 bg-white/[0.04] text-zinc-300'}>{lead.status}</Badge></TableCell>
+                  <TableCell className="text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</TableCell>
+                  <TableCell>
+                    <div className="flex min-w-28 items-center gap-2">
+                      <Progress value={Number(lead.probability ?? 0)} className="h-1.5" />
+                      <span className="w-9 text-xs text-zinc-500">{lead.probability}%</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-zinc-500">{daysAgo(lead.latestActivityAt)}</TableCell>
+                  <TableCell>
+                    <button type="button" onClick={() => actions.selectLead(lead.id)} className="max-w-sm truncate text-left text-zinc-400 hover:text-white">
+                      {lead.nextStep}
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -1241,6 +1316,7 @@ function DealDetailSheet({
         body: JSON.stringify({
           ...activeForm,
           title: activeForm.companyName,
+          status: activeForm.status,
           valueAmount: Number(activeForm.valueAmount),
           probability: Number(activeForm.probability),
         }),
@@ -1393,6 +1469,16 @@ function DealDetailSheet({
                   </DetailField>
                   <DetailField label="Stage">
                     <Input value={form.stage} onChange={event => setForm({ ...form, stage: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" />
+                  </DetailField>
+                  <DetailField label="Status">
+                    <select value={form.status} onChange={event => setForm({ ...form, status: event.target.value })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none">
+                      <option value="open">Open</option>
+                      <option value="qualified">Qualified</option>
+                      <option value="discovery">Discovery</option>
+                      <option value="qualification">Qualification</option>
+                      <option value="won">Won</option>
+                      <option value="lost">Lost</option>
+                    </select>
                   </DetailField>
                   <DetailField label="Value">
                     <Input value={form.valueAmount} type="number" onChange={event => setForm({ ...form, valueAmount: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" />

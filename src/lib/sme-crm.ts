@@ -69,6 +69,7 @@ export type LeadMutationInput = {
   owner?: string
   companyName?: string
   primaryPersonName?: string
+  status?: string
   stage?: string
   description?: string
   nextStep?: string
@@ -388,6 +389,7 @@ function cleanLeadInput(input: LeadMutationInput) {
     ownerName: input.owner?.trim(),
     companyName: input.companyName?.trim(),
     primaryPersonName: input.primaryPersonName?.trim(),
+    status: input.status === 'open' || input.status === 'qualified' || input.status === 'discovery' || input.status === 'qualification' || input.status === 'won' || input.status === 'lost' ? input.status : undefined,
     stage: input.stage?.trim(),
     stageName: input.stage?.trim(),
     description: input.description?.trim(),
@@ -441,7 +443,7 @@ export function createDemoCrmLead(data: LeadMutationInput): CrmLeadDto {
     title,
     owner: cleaned.ownerName || 'Sales owner',
     score: scoreFromProbability(probability, risk),
-    status: 'open',
+    status: cleaned.status || 'open',
     stage: cleaned.stage || 'New',
     stageName: cleaned.stageName || cleaned.stage || 'New',
     description: cleaned.description || 'New opportunity created from the CRM canvas.',
@@ -545,7 +547,7 @@ export async function createCrmLead(input: { workspaceId: string; ownerId: strin
     title,
     ownerName: data.ownerName || 'Sales owner',
     score: scoreFromProbability(probability, risk),
-    status: 'open',
+    status: data.status || 'open',
     stage: data.stage || 'New',
     stageName: data.stageName || data.stage || 'New',
     description: data.description || 'New opportunity created from the CRM canvas.',
@@ -583,6 +585,7 @@ export async function updateCrmLead(input: { workspaceId: string; leadId: string
       ownerName: data.ownerName || existing.ownerName,
       companyName: data.companyName || existing.companyName,
       primaryPersonName: data.primaryPersonName || existing.primaryPersonName,
+      status: data.status || existing.status,
       stage: data.stage || existing.stage,
       stageName: data.stageName || existing.stageName,
       description: data.description ?? existing.description,
@@ -843,6 +846,7 @@ export function updateDemoCrmLead(input: { leadId: string; data: LeadMutationInp
     owner: cleaned.ownerName || existing.owner,
     companyName: cleaned.companyName || existing.companyName,
     primaryPersonName: cleaned.primaryPersonName || existing.primaryPersonName,
+    status: cleaned.status || existing.status,
     stage: cleaned.stage || existing.stage,
     stageName: cleaned.stageName || existing.stageName,
     description: cleaned.description ?? existing.description,

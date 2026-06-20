@@ -11,6 +11,7 @@ function leadInput(body: Record<string, unknown>): LeadMutationInput {
     owner: typeof body.owner === 'string' ? body.owner : undefined,
     companyName: typeof body.companyName === 'string' ? body.companyName : undefined,
     primaryPersonName: typeof body.primaryPersonName === 'string' ? body.primaryPersonName : undefined,
+    status: typeof body.status === 'string' ? body.status : undefined,
     stage: typeof body.stage === 'string' ? body.stage : undefined,
     description: typeof body.description === 'string' ? body.description : undefined,
     nextStep: typeof body.nextStep === 'string' ? body.nextStep : undefined,
