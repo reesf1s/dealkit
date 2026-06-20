@@ -11,9 +11,16 @@ function csvCell(value: unknown) {
   return `"${text.replaceAll('"', '""')}"`
 }
 
+function csvDate(value?: string | Date | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
 function workspaceToCsv(workspace: ReturnType<typeof getDemoCrmWorkspacePayload>) {
   const rows = [
-    ['company', 'primary_contact', 'owner', 'stage', 'status', 'value', 'probability', 'risk', 'channel', 'next_step'],
+    ['company', 'primary_contact', 'owner', 'stage', 'status', 'value', 'probability', 'close_date', 'risk', 'channel', 'next_step'],
     ...workspace.leads.map(lead => [
       lead.companyName,
       lead.primaryPersonName,
@@ -22,6 +29,7 @@ function workspaceToCsv(workspace: ReturnType<typeof getDemoCrmWorkspacePayload>
       lead.status,
       lead.valueAmount,
       lead.probability,
+      csvDate(lead.expectedCloseDate),
       lead.risk,
       lead.channel,
       lead.nextStep,

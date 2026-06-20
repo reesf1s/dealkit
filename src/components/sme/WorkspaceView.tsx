@@ -22,6 +22,7 @@ import {
   Save,
   Send,
   ShieldAlert,
+  Trash2,
   TrendingUp,
   Users,
 } from 'lucide-react'
@@ -2030,12 +2031,14 @@ function DealDetailSheet({
   open,
   onOpenChange,
   onRefresh,
+  onArchived,
 }: {
   workspace: CrmWorkspacePayload
   lead: CrmLeadDto | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onRefresh: () => Promise<void>
+  onArchived: () => void
 }) {
   const [form, setForm] = useState<LeadFormState | null>(lead ? leadFormState(lead) : null)
   const [notes, setNotes] = useState(lead?.notes ?? '')
@@ -2172,6 +2175,19 @@ function DealDetailSheet({
     }
   }
 
+  async function archiveDeal() {
+    if (!window.confirm(`Archive ${activeLead.companyName}? This removes the deal and its linked CRM activity from the workspace.`)) return
+    setBusy('archive')
+    setNotice(null)
+    try {
+      await apiJson(`/api/crm/leads/${leadId}`, { method: 'DELETE' })
+      await onRefresh()
+      onArchived()
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto border-white/10 bg-[#080a0d] p-0 text-zinc-100 sm:max-w-4xl">
@@ -2186,6 +2202,10 @@ function DealDetailSheet({
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
               <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">{weightedValue ? `${money(weightedValue)} weighted` : 'No weighted value'}</Badge>
+              <Button type="button" variant="outline" onClick={() => void archiveDeal()} disabled={busy === 'archive'} className="h-8 rounded-full border-red-300/20 bg-red-300/10 px-3 text-xs text-red-100 hover:bg-red-300/15">
+                <Trash2 className="size-3.5" />
+                {busy === 'archive' ? 'Archiving...' : 'Archive'}
+              </Button>
             </div>
           </div>
         </SheetHeader>
@@ -2418,6 +2438,7 @@ export default function WorkspaceView({ view }: { view: WorkspaceViewName }) {
           if (!open) setSelectedLeadId(null)
         }}
         onRefresh={refresh}
+        onArchived={() => setSelectedLeadId(null)}
       />
     </div>
   )

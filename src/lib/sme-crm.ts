@@ -605,6 +605,15 @@ export async function updateCrmLead(input: { workspaceId: string; leadId: string
   return lead ? leadToDto(lead) : null
 }
 
+export async function deleteCrmLead(input: { workspaceId: string; leadId: string }) {
+  const [lead] = await db
+    .delete(crmLeads)
+    .where(and(eq(crmLeads.id, input.leadId), eq(crmLeads.workspaceId, input.workspaceId)))
+    .returning()
+
+  return lead ? leadToDto(lead) : null
+}
+
 export async function createCrmTask(input: { workspaceId: string; data: TaskMutationInput }) {
   const data = cleanTaskInput(input.data)
   let lead: CrmLeadRow | undefined
@@ -865,6 +874,24 @@ export function updateDemoCrmLead(input: { leadId: string; data: LeadMutationInp
   workspace.leads = workspace.leads.map(candidate => candidate.id === input.leadId ? updated : candidate)
   refreshDemoWorkspace(workspace)
   return updated
+}
+
+export function deleteDemoCrmLead(leadId: string) {
+  const workspace = getDemoCrmWorkspaceState()
+  const lead = workspace.leads.find(candidate => candidate.id === leadId)
+  if (!lead) return null
+
+  workspace.leads = workspace.leads.filter(candidate => candidate.id !== leadId)
+  workspace.messages = Object.fromEntries(
+    Object.entries(workspace.messages).map(([channel, messages]) => [
+      channel,
+      messages.filter(message => message.leadId !== leadId),
+    ]),
+  ) as Record<ChannelId, CrmMessageDto[]>
+  workspace.tasks = workspace.tasks.filter(task => task.companyName !== lead.companyName && task.personName !== lead.primaryPersonName)
+  workspace.activities = workspace.activities.filter(activity => activity.companyName !== lead.companyName && activity.personName !== lead.primaryPersonName)
+  refreshDemoWorkspace(workspace)
+  return lead
 }
 
 export function addDemoCrmTask(input: TaskMutationInput) {

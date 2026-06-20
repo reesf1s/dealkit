@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { updateCrmLead, updateDemoCrmLead, type LeadMutationInput } from '@/lib/sme-crm'
+import { deleteCrmLead, deleteDemoCrmLead, updateCrmLead, updateDemoCrmLead, type LeadMutationInput } from '@/lib/sme-crm'
 import { logWorkspaceEvent } from '@/lib/audit'
 
 function leadInput(body: Record<string, unknown>): LeadMutationInput {
@@ -63,5 +63,43 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   } catch (error) {
     console.error('[PATCH /api/crm/leads/[id]]', error)
     return NextResponse.json({ error: 'Unable to update lead' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await context.params
+
+    if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
+      const lead = deleteDemoCrmLead(id)
+      if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+      return NextResponse.json({ lead })
+    }
+
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const user = await currentUser()
+    const email = user?.emailAddresses[0]?.emailAddress
+    const { workspaceId } = await getWorkspaceContext(userId, email)
+    const lead = await deleteCrmLead({ workspaceId, leadId: id })
+
+    if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: 'crm.lead.deleted',
+      metadata: {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        stage: lead.stageName,
+        status: lead.status,
+        valueAmount: lead.valueAmount,
+      },
+    })
+    return NextResponse.json({ lead })
+  } catch (error) {
+    console.error('[DELETE /api/crm/leads/[id]]', error)
+    return NextResponse.json({ error: 'Unable to archive lead' }, { status: 500 })
   }
 }
