@@ -1805,6 +1805,23 @@ function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
   const bestCase = workspace.leads.filter(lead => Number(lead.probability ?? 0) >= 45 && Number(lead.probability ?? 0) < 70)
   const pipeline = workspace.leads.filter(lead => Number(lead.probability ?? 0) < 45)
   const bandValue = (leads: CrmLeadDto[]) => leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+  const activeLeads = workspace.leads.filter(lead => lead.status !== 'won' && lead.status !== 'lost')
+  const commitValue = bandValue(commit)
+  const bestCaseValue = bandValue(bestCase)
+  const pipelineValue = bandValue(pipeline)
+  const commitTarget = Math.round(metrics.total * 0.6)
+  const commitGap = Math.max(0, commitTarget - commitValue)
+  const missingCloseDates = activeLeads.filter(lead => !lead.expectedCloseDate)
+  const datedRisk = activeLeads.filter(lead => {
+    if (!lead.expectedCloseDate) return false
+    const daysToClose = Math.ceil((new Date(lead.expectedCloseDate).getTime() - Date.now()) / 86_400_000)
+    return daysToClose <= 14 && (lead.risk === 'hot' || Number(lead.probability ?? 0) < 60)
+  })
+  const slippageCandidates = [...activeLeads]
+    .filter(lead => lead.risk === 'hot' || Number(lead.probability ?? 0) < 45 || !lead.expectedCloseDate)
+    .sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0))
+    .slice(0, 4)
+  const ownerForecastRows = useOwners(workspace).slice(0, 4)
 
   async function patchForecast(lead: CrmLeadDto, data: Partial<{ stage: string; status: string; probability: number; risk: CrmLeadDto['risk'] }>) {
     setBusyLeadId(lead.id)
@@ -1838,10 +1855,89 @@ function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
         <StatCard label="Open tasks" value={`${metrics.tasks}`} detail="Execution work tied to deals." icon={CheckCircle2} />
       </div>
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Commit" value={money(bandValue(commit))} detail={`${commit.length} deals at 70%+ probability.`} icon={CheckCircle2} />
-        <StatCard label="Best case" value={money(bandValue(bestCase))} detail={`${bestCase.length} deals that can still land.`} icon={ShieldAlert} />
-        <StatCard label="Pipeline" value={money(bandValue(pipeline))} detail={`${pipeline.length} early or weak-intent deals.`} icon={Gauge} />
+        <StatCard label="Commit" value={money(commitValue)} detail={`${commit.length} deals at 70%+ probability.`} icon={CheckCircle2} />
+        <StatCard label="Best case" value={money(bestCaseValue)} detail={`${bestCase.length} deals that can still land.`} icon={ShieldAlert} />
+        <StatCard label="Pipeline" value={money(pipelineValue)} detail={`${pipeline.length} early or weak-intent deals.`} icon={Gauge} />
       </div>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle>Forecast confidence</CardTitle>
+                <CardDescription>Commit coverage, close-date hygiene, and slippage risk before the manager call.</CardDescription>
+              </div>
+              <Badge variant="outline" className={commitGap ? 'border-yellow-300/20 bg-yellow-300/10 text-yellow-100' : 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'}>
+                {commitGap ? `${money(commitGap)} commit gap` : 'Commit covered'}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Commit coverage</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{metrics.total ? Math.round((commitValue / metrics.total) * 100) : 0}%</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">{money(commitValue)} committed against a {money(commitTarget)} management target.</p>
+            </div>
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Close-date risk</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{datedRisk.length}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">Closing inside 14 days with low confidence or hot risk.</p>
+            </div>
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Missing close dates</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{missingCloseDates.length}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">Rows that need hygiene before a reliable readout.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Slippage watch</CardTitle>
+            <CardDescription>Biggest open deals that can distort the number.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {slippageCandidates.map(lead => (
+              <button key={lead.id} type="button" onClick={() => actions.selectLead(lead.id)} className="grid gap-2 rounded-[18px] border border-white/10 bg-black/20 p-3 text-left transition hover:bg-white/[0.06]">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-sm font-medium text-white">{lead.companyName}</p>
+                  <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                </div>
+                <p className="truncate text-xs text-zinc-500">{shortDate(lead.expectedCloseDate)} · {lead.probability}% · {lead.nextStep}</p>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader>
+          <CardTitle>Owner forecast rollup</CardTitle>
+          <CardDescription>Who owns the number, how much is weighted, and where risk sits.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {ownerForecastRows.map(owner => (
+            <button key={owner.owner} type="button" onClick={() => owner.deals[0] ? actions.selectLead(owner.deals[0].id) : undefined} className={cn(pillInsetClass, 'p-4 text-left transition hover:bg-white/[0.07]')}>
+              <div className="flex items-center gap-3">
+                <DealAvatar value={owner.owner} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{owner.owner}</p>
+                  <p className="text-xs text-zinc-500">{owner.deals.length} deals · {owner.atRisk} risky</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-[16px] border border-white/8 bg-black/20 p-3">
+                  <p className="text-zinc-500">Pipeline</p>
+                  <p className="mt-1 font-semibold text-white">{money(owner.pipeline)}</p>
+                </div>
+                <div className="rounded-[16px] border border-white/8 bg-black/20 p-3">
+                  <p className="text-zinc-500">Weighted</p>
+                  <p className="mt-1 font-semibold text-white">{money(owner.weighted)}</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </CardContent>
+      </Card>
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader>
           <CardTitle>Stage mix</CardTitle>
