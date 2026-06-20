@@ -2238,13 +2238,26 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
   const [coachNotice, setCoachNotice] = useState<string | null>(null)
   const [draftLead, setDraftLead] = useState<CrmLeadDto | null>(null)
   const [draftText, setDraftText] = useState('')
-  const rankedLeads = [...workspace.leads]
-    .sort((a, b) => (
-      Number(b.valueAmount ?? 0) * (100 - Number(b.probability ?? 0)) + Number(b.openTaskCount ?? 0) * 2500
-    ) - (
-      Number(a.valueAmount ?? 0) * (100 - Number(a.probability ?? 0)) + Number(a.openTaskCount ?? 0) * 2500
-    ))
+  const coachRows = workspace.leads.map(lead => {
+    const probabilityGap = 100 - Number(lead.probability ?? 0)
+    const value = Number(lead.valueAmount ?? 0)
+    const staleDays = Math.max(0, Math.round((Date.now() - new Date(lead.latestActivityAt ?? Date.now()).getTime()) / 86_400_000))
+    const score = Math.round(value * probabilityGap / 1000) + Number(lead.openTaskCount ?? 0) * 25 + staleDays * 12 + (lead.risk === 'hot' ? 120 : lead.risk === 'warm' ? 60 : 20)
+    const drivers = [
+      `${money(value)} value`,
+      `${lead.probability}% confidence`,
+      `${staleDays}d since activity`,
+      `${lead.openTaskCount ?? 0} tasks`,
+      `${lead.risk} risk`,
+    ]
+    return { lead, score, drivers, staleDays }
+  }).sort((a, b) => b.score - a.score)
+  const rankedLeads = coachRows.map(row => row.lead)
     .slice(0, 5)
+  const topRows = coachRows.slice(0, 5)
+  const highRiskRows = coachRows.filter(row => row.lead.risk === 'hot' || row.score > 500)
+  const coachValue = topRows.reduce((sum, row) => sum + Number(row.lead.valueAmount ?? 0), 0)
+  const taskBacklog = workspace.tasks.filter(task => task.priority === 'high' || task.priority === 'medium').length
   const relatedLeads = (item: RecoveryInsight) => {
     const matches = workspace.leads.filter(lead => lead.status !== 'won' && classifyRecoveryIntent(lead) === item.intentId)
     return (matches.length ? matches : rankedLeads).slice(0, Math.max(1, Math.min(item.count || 3, 4)))
@@ -2301,8 +2314,31 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
     }
   }
 
+  async function sendDraft() {
+    if (!draftLead || !draftText.trim()) return
+    setBusyCoachAction(`send:${draftLead.id}`)
+    setCoachNotice(null)
+    try {
+      await apiJson('/api/crm/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: draftLead.id,
+          channel: draftLead.channel,
+          from: 'rep',
+          text: draftText.trim(),
+        }),
+      })
+      setCoachNotice(`Draft sent to ${draftLead.companyName}`)
+      setDraftText('')
+      setDraftLead(null)
+      await actions.refresh()
+    } finally {
+      setBusyCoachAction(null)
+    }
+  }
+
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader>
           <CardTitle>Recommended actions</CardTitle>
@@ -2310,6 +2346,23 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
         </CardHeader>
         <CardContent className="grid gap-3">
           {coachNotice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{coachNotice}</div> : null}
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Coached value</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{money(coachValue)}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">Top five deals in the coaching queue.</p>
+            </div>
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">High-risk queue</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{highRiskRows.length}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">Deals with hot risk or high coaching score.</p>
+            </div>
+            <div className={cn(pillInsetClass, 'p-4')}>
+              <p className="text-xs text-zinc-500">Task backlog</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{taskBacklog}</p>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">Open medium/high-priority execution work.</p>
+            </div>
+          </div>
           {workspace.intelligence.recommendations.map(item => {
             const related = relatedLeads(item)
             const actionable = actionableLeads(item)
@@ -2343,18 +2396,25 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
         <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
           <CardHeader>
             <CardTitle>Deal coaching queue</CardTitle>
-            <CardDescription>Open a record, draft a reply, save notes, or create a task.</CardDescription>
+            <CardDescription>Why these deals are first, with draft and send controls.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {rankedLeads.map(lead => (
+            {topRows.map(row => {
+              const lead = row.lead
+              return (
               <div key={lead.id} className={cn(pillInsetClass, 'p-4')}>
                 <button type="button" onClick={() => actions.selectLead(lead.id)} className="block w-full text-left">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-medium text-white">{lead.companyName}</p>
-                    <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                    <Badge variant="outline" className={riskTone(lead.risk)}>{row.score}</Badge>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-zinc-500">{lead.nextStep}</p>
                   <p className="mt-3 text-xs text-zinc-400">{money(Number(lead.valueAmount ?? 0))} · {Number(lead.probability ?? 0)}% probability</p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {row.drivers.map(driver => (
+                      <Badge key={driver} variant="outline" className="border-white/10 bg-white/[0.04] text-[11px] text-zinc-400">{driver}</Badge>
+                    ))}
+                  </div>
                 </button>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => void draftFollowUp(lead)} disabled={busyCoachAction === `draft:${lead.id}`} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
@@ -2366,7 +2426,8 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
                   </Button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </CardContent>
         </Card>
 
@@ -2378,9 +2439,15 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
             </CardHeader>
             <CardContent className="grid gap-3">
               <Textarea value={draftText} onChange={event => setDraftText(event.target.value)} className="min-h-52 rounded-[24px] border-white/10 bg-black/20 text-sm leading-6 text-white" />
-              <Button type="button" onClick={() => actions.selectLead(draftLead.id)} className="w-fit rounded-full bg-white text-black hover:bg-zinc-200">
-                Open deal to send
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={() => void sendDraft()} disabled={busyCoachAction === `send:${draftLead.id}` || !draftText.trim()} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                  <Send className="size-4" />
+                  {busyCoachAction === `send:${draftLead.id}` ? 'Sending...' : 'Send draft'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => actions.selectLead(draftLead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                  Open deal
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : null}
