@@ -61,6 +61,24 @@ type LeadFormState = {
   description: string
 }
 
+type CrmViewFilters = {
+  query?: string
+  stage?: string
+  owner?: string
+  risk?: CrmLeadDto['risk']
+  channel?: ChannelId
+  minProbability?: number
+}
+
+type CrmSavedView = {
+  id: string
+  name: string
+  description: string
+  scope: 'system' | 'workspace'
+  filters: CrmViewFilters
+  createdAt: string
+}
+
 const CHANNEL_ICONS: Record<ChannelId, typeof Mail> = {
   mail: Mail,
   linkedin: Linkedin,
@@ -207,6 +225,23 @@ function leadMessages(workspace: CrmWorkspacePayload, leadId: string) {
     .flat()
     .filter(message => message.leadId === leadId)
     .sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+}
+
+function leadMatchesFilters(lead: CrmLeadDto, filters: CrmViewFilters) {
+  if (filters.stage && filters.stage !== 'All' && (lead.stageName || lead.stage) !== filters.stage) return false
+  if (filters.owner && filters.owner !== 'All' && lead.owner !== filters.owner) return false
+  if (filters.risk && lead.risk !== filters.risk) return false
+  if (filters.channel && lead.channel !== filters.channel) return false
+  if (filters.minProbability && Number(lead.probability ?? 0) < filters.minProbability) return false
+  if (filters.query && !`${lead.companyName} ${lead.primaryPersonName} ${lead.owner} ${lead.nextStep}`.toLowerCase().includes(filters.query.toLowerCase())) return false
+  return true
+}
+
+async function fetchSavedViews() {
+  const response = await fetch('/api/crm/views', { headers: { Accept: 'application/json' } })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error ?? `Saved views request failed: ${response.status}`)
+  return payload as { views: CrmSavedView[] }
 }
 
 function useAccounts(workspace: CrmWorkspacePayload) {
@@ -578,15 +613,79 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
 
 function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const stages = ['All', ...new Set(workspace.leads.map(lead => lead.stageName || lead.stage))]
+  const owners = ['All', ...new Set(workspace.leads.map(lead => lead.owner || 'Unassigned'))]
   const [stageFilter, setStageFilter] = useState('All')
+  const [ownerFilter, setOwnerFilter] = useState('All')
+  const [riskFilter, setRiskFilter] = useState<'all' | CrmLeadDto['risk']>('all')
+  const [channelFilter, setChannelFilter] = useState<'all' | ChannelId>('all')
+  const [minProbability, setMinProbability] = useState('0')
   const [query, setQuery] = useState('')
   const [busyLeadId, setBusyLeadId] = useState<string | null>(null)
+  const [savedViews, setSavedViews] = useState<CrmSavedView[]>([])
+  const [viewName, setViewName] = useState('')
+  const [viewNotice, setViewNotice] = useState<string | null>(null)
+  const [viewBusy, setViewBusy] = useState(false)
+  const activeFilters: CrmViewFilters = {
+    query: query.trim() || undefined,
+    stage: stageFilter !== 'All' ? stageFilter : undefined,
+    owner: ownerFilter !== 'All' ? ownerFilter : undefined,
+    risk: riskFilter !== 'all' ? riskFilter : undefined,
+    channel: channelFilter !== 'all' ? channelFilter : undefined,
+    minProbability: Number(minProbability) > 0 ? Number(minProbability) : undefined,
+  }
   const filteredLeads = workspace.leads.filter(lead => {
-    const matchesStage = stageFilter === 'All' || (lead.stageName || lead.stage) === stageFilter
-    const matchesQuery = `${lead.companyName} ${lead.primaryPersonName} ${lead.owner} ${lead.nextStep}`.toLowerCase().includes(query.toLowerCase())
-    return matchesStage && matchesQuery
+    return leadMatchesFilters(lead, activeFilters)
   })
   const pipelineStages = ['Discovery', 'Evaluation', 'Proposal', 'Negotiation', 'Commit']
+
+  useEffect(() => {
+    let active = true
+    fetchSavedViews()
+      .then(payload => {
+        if (active) setSavedViews(payload.views)
+      })
+      .catch(() => {
+        if (active) setSavedViews([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  function applyView(view: CrmSavedView) {
+    setQuery(view.filters.query ?? '')
+    setStageFilter(view.filters.stage ?? 'All')
+    setOwnerFilter(view.filters.owner ?? 'All')
+    setRiskFilter(view.filters.risk ?? 'all')
+    setChannelFilter(view.filters.channel ?? 'all')
+    setMinProbability(String(view.filters.minProbability ?? 0))
+    setViewNotice(`${view.name} applied`)
+  }
+
+  async function saveCurrentView() {
+    if (!viewName.trim()) {
+      setViewNotice('Name the view first')
+      return
+    }
+    setViewBusy(true)
+    setViewNotice(null)
+    try {
+      await apiJson('/api/crm/views', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: viewName,
+          description: `${filteredLeads.length} matching deals`,
+          filters: activeFilters,
+        }),
+      })
+      const payload = await fetchSavedViews()
+      setSavedViews(payload.views)
+      setViewName('')
+      setViewNotice('View saved')
+    } finally {
+      setViewBusy(false)
+    }
+  }
 
   async function patchLead(lead: CrmLeadDto, data: Partial<{ stage: string; status: string; probability: number; risk: CrmLeadDto['risk'] }>) {
     setBusyLeadId(lead.id)
@@ -658,17 +757,33 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
       </Card>
 
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-        <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
+        <CardHeader className="gap-4">
           <div>
             <CardTitle>Deal table</CardTitle>
             <CardDescription>Built for scanning, editing, notes, next steps, and follow-up work.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
+            {savedViews.map(view => (
+              <Button
+                key={view.id}
+                type="button"
+                variant="outline"
+                onClick={() => applyView(view)}
+                className={cn(
+                  'rounded-full border-white/10 bg-white/[0.04] text-zinc-100',
+                  view.scope === 'system' && 'border-blue-300/20 bg-blue-300/10 text-blue-100',
+                )}
+              >
+                {view.name}
+              </Button>
+            ))}
+          </div>
+          <div className="grid gap-2 lg:grid-cols-[minmax(180px,1.2fr)_repeat(4,minmax(130px,0.75fr))]">
             <Input
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Search deals..."
-              className="h-10 w-56 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
+              className="h-10 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
             />
             <select
               value={stageFilter}
@@ -677,6 +792,36 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
             >
               {stages.map(stage => <option key={stage} value={stage}>{stage}</option>)}
             </select>
+            <select value={ownerFilter} onChange={event => setOwnerFilter(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+              {owners.map(owner => <option key={owner} value={owner}>{owner === 'All' ? 'All owners' : owner}</option>)}
+            </select>
+            <select value={riskFilter} onChange={event => setRiskFilter(event.target.value as 'all' | CrmLeadDto['risk'])} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+              <option value="all">All risk</option>
+              <option value="hot">Hot</option>
+              <option value="warm">Warm</option>
+              <option value="new">New</option>
+            </select>
+            <select value={channelFilter} onChange={event => setChannelFilter(event.target.value as 'all' | ChannelId)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+              <option value="all">All channels</option>
+              <option value="mail">Email</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="webchat">Web chat</option>
+              <option value="meetings">Calls & meetings</option>
+            </select>
+          </div>
+          <div className={cn(pillInsetClass, 'grid gap-2 p-3 md:grid-cols-[1fr_140px_auto] md:items-center')}>
+            <Input value={viewName} onChange={event => setViewName(event.target.value)} placeholder="Name this view..." className="h-10 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600" />
+            <select value={minProbability} onChange={event => setMinProbability(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+              <option value="0">Any prob.</option>
+              <option value="25">25%+</option>
+              <option value="50">50%+</option>
+              <option value="70">70%+</option>
+            </select>
+            <Button type="button" onClick={() => void saveCurrentView()} disabled={viewBusy} className="rounded-full bg-white text-black hover:bg-zinc-200">
+              <Save className="size-4" />
+              {viewBusy ? 'Saving...' : 'Save view'}
+            </Button>
+            {viewNotice ? <p className="text-xs text-zinc-500 md:col-span-3">{viewNotice}</p> : null}
           </div>
         </CardHeader>
         <CardContent>
