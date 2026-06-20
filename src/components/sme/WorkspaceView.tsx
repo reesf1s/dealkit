@@ -10,12 +10,14 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardList,
+  FileSpreadsheet,
   FileText,
   Gauge,
   Linkedin,
   Mail,
   MessageCircle,
   Pencil,
+  PhoneCall,
   PlugZap,
   Plus,
   RefreshCw,
@@ -25,6 +27,7 @@ import {
   Trash2,
   TrendingUp,
   Users,
+  Workflow,
 } from 'lucide-react'
 
 import type { ChannelId, CrmLeadDto, CrmMessageDto, CrmWorkspacePayload } from '@/lib/sme-crm'
@@ -89,11 +92,50 @@ const CHANNEL_ICONS: Record<ChannelId, typeof Mail> = {
   meetings: CalendarClock,
 }
 
+const OPERATING_TOOLS = [
+  {
+    href: '/import',
+    title: 'Import pipeline',
+    detail: 'Validate spreadsheet deals before they enter forecast.',
+    icon: FileSpreadsheet,
+  },
+  {
+    href: '/call-review',
+    title: 'Review a call',
+    detail: 'Turn transcripts into risk, objections, tasks, and deal activity.',
+    icon: PhoneCall,
+  },
+  {
+    href: '/automations',
+    title: 'Run workflows',
+    detail: 'Create follow-up tasks from stale deals and missing proof.',
+    icon: Workflow,
+  },
+  {
+    href: '/reports',
+    title: 'Readout',
+    detail: 'Inspect funnel quality, risk concentration, and coverage.',
+    icon: FileText,
+  },
+  {
+    href: '/channels',
+    title: 'Channels',
+    detail: 'Manage the inbox sources feeding the workspace.',
+    icon: PlugZap,
+  },
+  {
+    href: '/settings',
+    title: 'Workspace admin',
+    detail: 'Export data, audit activity, billing, and team controls.',
+    icon: ShieldAlert,
+  },
+]
+
 const VIEW_COPY: Record<WorkspaceViewName, { eyebrow: string; title: string; description: string }> = {
   dashboard: {
     eyebrow: 'Command center',
-    title: 'Revenue dashboard',
-    description: 'A focused operating view for pipeline health, urgent work, and next actions.',
+    title: 'Command center',
+    description: 'A tighter operating room for the deals, conversations, and workflows that change the week.',
   },
   inbox: {
     eyebrow: 'Conversations',
@@ -618,6 +660,40 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
           </CardContent>
         </Card>
       </section>
+
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardHeader className="md:flex-row md:items-end md:justify-between">
+          <div>
+            <CardTitle>Operating system</CardTitle>
+            <CardDescription>Supporting modules for data intake, call intelligence, automation, reporting, and workspace control.</CardDescription>
+          </div>
+          <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+            <Link href="/settings">
+              Admin
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {OPERATING_TOOLS.map(tool => {
+            const Icon = tool.icon
+            return (
+              <Link key={tool.href} href={tool.href} className={cn(pillInsetClass, 'group grid gap-4 p-4 transition hover:bg-white/[0.07]')}>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="grid size-10 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-200">
+                    <Icon className="size-4" />
+                  </span>
+                  <ArrowUpRight className="size-4 text-zinc-600 transition group-hover:text-zinc-200" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{tool.title}</p>
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">{tool.detail}</p>
+                </div>
+              </Link>
+            )
+          })}
+        </CardContent>
+      </Card>
     </div>
   )
 }

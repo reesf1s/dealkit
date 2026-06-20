@@ -40,24 +40,27 @@ type NavLink = {
 }
 
 const navigation: NavLink[] = [
-  { href: '/home', label: 'Dashboard', icon: 'home' },
-  { href: '/inbox', label: 'Inbox', icon: 'conversations' },
-  { href: '/deals', label: 'Deals', icon: 'pipeline' },
-  { href: '/accounts', label: 'Accounts', icon: 'accounts' },
-  { href: '/tasks', label: 'Tasks', icon: 'tasks' },
-  { href: '/meetings', label: 'Meetings', icon: 'meetings' },
-  { href: '/call-review', label: 'Call review', icon: 'call-review' },
-  { href: '/team', label: 'Team', icon: 'team' },
+  { href: '/home', label: 'Command', icon: 'home' },
+  { href: '/deals', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/inbox', label: 'Conversations', icon: 'conversations' },
   { href: '/forecast', label: 'Forecast', icon: 'forecast' },
-  { href: '/reports', label: 'Reports', icon: 'reports' },
-  { href: '/import', label: 'Import', icon: 'import' },
-  { href: '/automations', label: 'Automations', icon: 'automation' },
-  { href: '/coach', label: 'AI coach', icon: 'coaching' },
-  { href: '/channels', label: 'Channels', icon: 'integrations' },
+  { href: '/coach', label: 'Coach', icon: 'coaching' },
 ]
 
 const secondaryNavigation: NavLink[] = [
   { href: '/settings', label: 'Settings', icon: 'settings' },
+]
+
+const utilityNavigation: NavLink[] = [
+  { href: '/accounts', label: 'Accounts', icon: 'accounts' },
+  { href: '/tasks', label: 'Tasks', icon: 'tasks' },
+  { href: '/meetings', label: 'Meetings', icon: 'meetings' },
+  { href: '/team', label: 'Team', icon: 'team' },
+  { href: '/reports', label: 'Reports', icon: 'reports' },
+  { href: '/import', label: 'Import', icon: 'import' },
+  { href: '/automations', label: 'Automations', icon: 'automation' },
+  { href: '/call-review', label: 'Call review', icon: 'call-review' },
+  { href: '/channels', label: 'Channels', icon: 'integrations' },
   { href: '/settings/billing', label: 'Billing', icon: 'billing' },
 ]
 
@@ -127,7 +130,8 @@ function RailNavItem({ item }: { item: NavLink }) {
 
 export default function SmeDashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const currentLabel = navigation.find(item => item.href === pathname)?.label ?? secondaryNavigation.find(item => item.href === pathname)?.label ?? 'Workspace'
+  const allNavigation = [...navigation, ...secondaryNavigation, ...utilityNavigation]
+  const currentLabel = allNavigation.find(item => item.href === pathname)?.label ?? 'Workspace'
 
   return (
     <div className="min-h-screen overflow-hidden bg-[#080a0d] text-zinc-100">
