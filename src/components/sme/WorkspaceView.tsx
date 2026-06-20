@@ -30,7 +30,7 @@ import {
   Workflow,
 } from 'lucide-react'
 
-import type { ChannelId, CrmLeadDto, CrmMessageDto, CrmWorkspacePayload } from '@/lib/sme-crm'
+import type { ChannelId, CrmLeadDto, CrmWorkspacePayload } from '@/lib/sme-crm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -1067,12 +1067,32 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const [selectedLeadId, setSelectedLeadId] = useState('')
   const [reply, setReply] = useState('')
-  const [busyInbox, setBusyInbox] = useState<'draft' | 'send' | null>(null)
+  const [busyInbox, setBusyInbox] = useState<'draft' | 'send' | 'task' | null>(null)
   const [inboxNotice, setInboxNotice] = useState<string | null>(null)
   const allMessages = Object.entries(workspace.messages).flatMap(([channel, messages]) =>
     messages.map(message => ({ ...message, channel: channel as ChannelId })),
   ).sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
-  const selectedLead = workspace.leads.find(lead => lead.id === selectedLeadId) ?? workspace.leads.find(lead => lead.id === allMessages[0]?.leadId) ?? workspace.leads[0]
+  const conversationRows = workspace.leads
+    .map(lead => {
+      const messages = leadMessages(workspace, lead.id).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+      const lastMessage = messages.at(-1)
+      const lastBuyerMessage = [...messages].reverse().find(message => message.from === 'customer')
+      const needsReply = lastMessage?.from === 'customer'
+      return {
+        lead,
+        messages,
+        lastMessage,
+        lastBuyerMessage,
+        needsReply,
+        priority: (needsReply ? 100 : 0) + (lead.risk === 'hot' ? 40 : 0) + Math.round(Number(lead.valueAmount ?? 0) / 1000),
+      }
+    })
+    .filter(row => row.lastMessage)
+    .sort((a, b) => b.priority - a.priority || new Date(b.lastMessage?.sentAt ?? 0).getTime() - new Date(a.lastMessage?.sentAt ?? 0).getTime())
+  const needsReplyRows = conversationRows.filter(row => row.needsReply)
+  const hotConversationRows = conversationRows.filter(row => row.lead.risk === 'hot')
+  const inboxValue = conversationRows.reduce((sum, row) => sum + Number(row.lead.valueAmount ?? 0), 0)
+  const selectedLead = workspace.leads.find(lead => lead.id === selectedLeadId) ?? conversationRows[0]?.lead ?? workspace.leads.find(lead => lead.id === allMessages[0]?.leadId) ?? workspace.leads[0]
   const thread = selectedLead ? leadMessages(workspace, selectedLead.id).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()) : []
 
   useEffect(() => {
@@ -1121,58 +1141,119 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
     }
   }
 
+  async function createInboxTask() {
+    if (!selectedLead) return
+    setBusyInbox('task')
+    setInboxNotice(null)
+    try {
+      await apiJson('/api/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: selectedLead.id,
+          title: `Follow up: ${selectedLead.companyName}`,
+          description: selectedLead.nextStep || 'Follow up from the conversation queue.',
+          priority: selectedLead.risk === 'hot' ? 'high' : 'medium',
+          companyName: selectedLead.companyName,
+          personName: selectedLead.primaryPersonName,
+        }),
+      })
+      await actions.refresh()
+      setInboxNotice(`Task created for ${selectedLead.companyName}`)
+    } finally {
+      setBusyInbox(null)
+    }
+  }
+
   return (
-    <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,0.9fr)_minmax(360px,0.9fr)]">
-      <div className="grid content-start gap-3">
-        {workspace.channels.map(channel => {
-          const Icon = CHANNEL_ICONS[channel.id]
-          const count = workspace.messages[channel.id]?.length ?? 0
-          return (
-            <Card key={channel.id} className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-              <CardContent className="flex items-center justify-between gap-3 p-4">
-                <div className="flex items-center gap-3">
-                  <span className="grid size-10 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-200"><Icon className="size-4" /></span>
-                  <div>
-                    <p className="font-medium text-white">{channel.name}</p>
-                    <p className="text-xs text-zinc-500">{count} messages</p>
+    <div className="grid gap-4">
+      <section className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Conversations" value={`${conversationRows.length}`} detail={`${allMessages.length} captured messages across channels.`} icon={MessageCircle} />
+        <StatCard label="Needs reply" value={`${needsReplyRows.length}`} detail="Threads where the latest message came from the buyer." icon={Send} />
+        <StatCard label="Hot threads" value={`${hotConversationRows.length}`} detail="Conversation streams attached to hot-risk deals." icon={ShieldAlert} />
+        <StatCard label="Pipeline in inbox" value={money(inboxValue)} detail="Open value represented in current conversations." icon={TrendingUp} />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,0.9fr)_minmax(360px,0.9fr)]">
+        <div className="grid content-start gap-3">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Channel health</CardTitle>
+              <CardDescription>Sources feeding the revenue inbox.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {workspace.channels.map(channel => {
+                const Icon = CHANNEL_ICONS[channel.id]
+                const count = workspace.messages[channel.id]?.length ?? 0
+                return (
+                  <div key={channel.id} className={cn(pillInsetClass, 'flex items-center justify-between gap-3 p-3')}>
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-200"><Icon className="size-4" /></span>
+                      <div>
+                        <p className="text-sm font-medium text-white">{channel.name}</p>
+                        <p className="text-xs text-zinc-500">{count} messages</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={channel.connected ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-zinc-500/20 bg-zinc-500/10 text-zinc-300'}>
+                      {channel.connected ? 'Live' : 'Pending'}
+                    </Badge>
                   </div>
-                </div>
-                <Badge variant="outline" className={channel.connected ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-zinc-500/20 bg-zinc-500/10 text-zinc-300'}>
-                  {channel.connected ? 'Live' : 'Pending'}
-                </Badge>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Reply pressure</CardTitle>
+              <CardDescription>Buyer-led threads that should not go cold.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2">
+              {needsReplyRows.slice(0, 4).map(row => (
+                <button key={row.lead.id} type="button" onClick={() => setSelectedLeadId(row.lead.id)} className="flex items-center justify-between gap-3 rounded-full border border-white/8 bg-black/20 px-3 py-2 text-left transition hover:bg-white/[0.06]">
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-medium text-zinc-200">{row.lead.companyName}</span>
+                    <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{row.lastBuyerMessage?.text}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-zinc-500">{shortDate(row.lastMessage?.sentAt)}</span>
+                </button>
+              ))}
+              {!needsReplyRows.length ? <p className="text-xs leading-5 text-zinc-500">No buyer-led replies are waiting.</p> : null}
+            </CardContent>
+          </Card>
+        </div>
 
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader>
-          <CardTitle>Conversation queue</CardTitle>
-          <CardDescription>Prioritize buyer messages, then work the thread without leaving inbox.</CardDescription>
+          <CardTitle>Conversation triage</CardTitle>
+          <CardDescription>Grouped by deal, weighted by buyer reply, risk, and pipeline value.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {allMessages.map((message: CrmMessageDto) => {
-            const lead = workspace.leads.find(item => item.id === message.leadId)
-            const Icon = CHANNEL_ICONS[message.channel]
+          {conversationRows.map(row => {
+            const lead = row.lead
+            const message = row.lastMessage
+            const Icon = CHANNEL_ICONS[lead.channel]
             return (
               <button
-                key={message.id}
+                key={lead.id}
                 type="button"
-                onClick={() => lead ? setSelectedLeadId(lead.id) : undefined}
+                onClick={() => setSelectedLeadId(lead.id)}
                 className={cn(
                   pillInsetClass,
                   'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start',
-                  selectedLead?.id === lead?.id && 'border-blue-300/30 bg-blue-300/10',
+                  selectedLead?.id === lead.id && 'border-blue-300/30 bg-blue-300/10',
                 )}
               >
                 <span className="grid size-9 place-items-center rounded-full bg-white/[0.06] text-zinc-300"><Icon className="size-4" /></span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">{lead?.companyName ?? 'Unknown account'}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{channelLabel(message.channel)} · {message.from === 'rep' ? 'You' : message.from}</p>
-                  <p className="mt-3 text-sm leading-6 text-zinc-300">{message.text}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-white">{lead.companyName}</p>
+                    {row.needsReply ? <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">buyer replied</Badge> : null}
+                    <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500">{channelLabel(lead.channel)} · {message?.from === 'rep' ? 'You' : message?.from} · {money(Number(lead.valueAmount ?? 0))}</p>
+                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-300">{message?.text}</p>
                 </div>
-                <span className="text-xs text-zinc-500">{shortDate(message.sentAt)}</span>
+                <span className="text-xs text-zinc-500">{shortDate(message?.sentAt)}</span>
               </button>
             )
           })}
@@ -1225,6 +1306,10 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
                 <Send className="size-4" />
                 {busyInbox === 'send' ? 'Sending...' : 'Send reply'}
               </Button>
+              <Button type="button" variant="outline" onClick={() => void createInboxTask()} disabled={!selectedLead || busyInbox !== null} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                <ClipboardList className="size-4" />
+                {busyInbox === 'task' ? 'Creating...' : 'Create task'}
+              </Button>
               {selectedLead ? (
                 <Button type="button" variant="outline" onClick={() => actions.selectLead(selectedLead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
                   Open deal
@@ -1234,7 +1319,8 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
           </div>
         </CardContent>
       </Card>
-    </section>
+      </section>
+    </div>
   )
 }
 
