@@ -88,6 +88,15 @@ export type TaskMutationInput = {
   personName?: string
 }
 
+export type ActivityMutationInput = {
+  leadId?: string
+  title?: string
+  body?: string
+  type?: string
+  companyName?: string
+  personName?: string
+}
+
 const channelIds = ['mail', 'linkedin', 'webchat', 'meetings'] as const
 const legacyChannelAliases: Record<string, ChannelId> = {
   instagram: 'meetings',
@@ -403,6 +412,17 @@ function cleanTaskInput(input: TaskMutationInput) {
   }
 }
 
+function cleanActivityInput(input: ActivityMutationInput) {
+  return {
+    leadId: input.leadId?.trim(),
+    title: input.title?.trim(),
+    body: input.body?.trim(),
+    type: input.type === 'call' || input.type === 'meeting' || input.type === 'email' || input.type === 'note' || input.type === 'intent' || input.type === 'risk' ? input.type : 'meeting',
+    companyName: input.companyName?.trim(),
+    personName: input.personName?.trim(),
+  }
+}
+
 function demoId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
 }
@@ -470,6 +490,21 @@ function createDemoCrmTask(input: TaskMutationInput): RecoveryTask {
     dueAt: dueAt.toISOString(),
     companyName: cleaned.companyName || 'New account',
     personName: cleaned.personName || 'Buyer',
+  }
+}
+
+function createDemoCrmActivity(input: ActivityMutationInput): RecoveryActivity {
+  const cleaned = cleanActivityInput(input)
+
+  return {
+    id: demoId('demo-activity'),
+    title: cleaned.title || 'Customer meeting logged',
+    body: cleaned.body || 'Captured a customer interaction and linked it back to the active deal.',
+    type: cleaned.type,
+    occurredAt: new Date().toISOString(),
+    companyName: cleaned.companyName || 'New account',
+    personName: cleaned.personName || 'Buyer',
+    dealTitle: cleaned.companyName || 'New account',
   }
 }
 
@@ -597,6 +632,40 @@ export async function createCrmTask(input: { workspaceId: string; data: TaskMuta
   }
 
   return taskToRecovery(task)
+}
+
+export async function createCrmActivity(input: { workspaceId: string; data: ActivityMutationInput }) {
+  const data = cleanActivityInput(input.data)
+  let lead: CrmLeadRow | undefined
+
+  if (data.leadId) {
+    const [candidate] = await db
+      .select()
+      .from(crmLeads)
+      .where(and(eq(crmLeads.id, data.leadId), eq(crmLeads.workspaceId, input.workspaceId)))
+      .limit(1)
+    lead = candidate
+  }
+
+  const [activity] = await db.insert(crmActivities).values({
+    workspaceId: input.workspaceId,
+    leadId: lead?.id,
+    title: data.title || 'Customer meeting logged',
+    body: data.body || 'Captured a customer interaction and linked it back to the active deal.',
+    type: data.type,
+    occurredAt: new Date(),
+    companyName: data.companyName || lead?.companyName || null,
+    personName: data.personName || lead?.primaryPersonName || null,
+  }).returning()
+
+  if (lead) {
+    await db
+      .update(crmLeads)
+      .set({ latestActivityAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(crmLeads.id, lead.id), eq(crmLeads.workspaceId, input.workspaceId)))
+  }
+
+  return activityToRecovery(activity)
 }
 
 export async function createCrmMessage(input: { workspaceId: string; leadId: string; channel: ChannelId; from: CrmMessageDto['from']; text: string }) {
@@ -777,6 +846,25 @@ export function addDemoCrmTask(input: TaskMutationInput) {
   }
   refreshDemoWorkspace(workspace)
   return task
+}
+
+export function addDemoCrmActivity(input: ActivityMutationInput) {
+  const workspace = getDemoCrmWorkspaceState()
+  const lead = input.leadId ? workspace.leads.find(candidate => candidate.id === input.leadId) : undefined
+  const activity = createDemoCrmActivity({
+    ...input,
+    companyName: input.companyName || lead?.companyName || undefined,
+    personName: input.personName || lead?.primaryPersonName || undefined,
+  })
+
+  workspace.activities = [activity, ...workspace.activities]
+  if (lead) {
+    workspace.leads = workspace.leads.map(candidate => (
+      candidate.id === lead.id ? { ...candidate, latestActivityAt: activity.occurredAt } : candidate
+    ))
+  }
+  refreshDemoWorkspace(workspace)
+  return activity
 }
 
 export function saveDemoCrmLeadNotes(input: { leadId: string; notes: string }) {

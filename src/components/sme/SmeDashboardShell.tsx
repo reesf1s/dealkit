@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils'
 type NavLink = {
   href: string
   label: string
-  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'forecast' | 'coaching' | 'integrations' | 'settings' | 'billing'
+  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'forecast' | 'coaching' | 'integrations' | 'settings' | 'billing'
 }
 
 const navigation: NavLink[] = [
@@ -45,6 +45,7 @@ const navigation: NavLink[] = [
   { href: '/deals', label: 'Deals', icon: 'pipeline' },
   { href: '/accounts', label: 'Accounts', icon: 'accounts' },
   { href: '/tasks', label: 'Tasks', icon: 'tasks' },
+  { href: '/meetings', label: 'Meetings', icon: 'meetings' },
   { href: '/forecast', label: 'Forecast', icon: 'forecast' },
   { href: '/coach', label: 'AI coach', icon: 'coaching' },
   { href: '/channels', label: 'Channels', icon: 'integrations' },
@@ -68,6 +69,8 @@ function NavIcon({ icon }: { icon: NavLink['icon'] }) {
       return <Building2 {...props} />
     case 'tasks':
       return <CheckSquare {...props} />
+    case 'meetings':
+      return <CalendarDays {...props} />
     case 'forecast':
       return <BarChart3 {...props} />
     case 'coaching':

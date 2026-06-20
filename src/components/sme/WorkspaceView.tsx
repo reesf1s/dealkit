@@ -39,7 +39,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { pillInsetClass, pillSurfaceClass } from '@/components/sme/halvex-system'
 import { cn } from '@/lib/utils'
 
-type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'forecast' | 'coach' | 'channels'
+type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'meetings' | 'forecast' | 'coach' | 'channels'
 
 type WorkspaceAction = {
   selectLead: (leadId: string) => void
@@ -91,6 +91,11 @@ const VIEW_COPY: Record<WorkspaceViewName, { eyebrow: string; title: string; des
     eyebrow: 'Execution',
     title: 'Task queue',
     description: 'The rep workbench for follow-ups, next steps, due work, and deal-linked activity.',
+  },
+  meetings: {
+    eyebrow: 'Call intelligence',
+    title: 'Meetings',
+    description: 'Customer conversations, transcript-style notes, decision signals, objections, and follow-up capture.',
   },
   forecast: {
     eyebrow: 'Forecast',
@@ -221,6 +226,22 @@ function useAccounts(workspace: CrmWorkspacePayload) {
       }
     }).sort((a, b) => b.weightedValue - a.weightedValue)
   }, [workspace])
+}
+
+function activityLead(workspace: CrmWorkspacePayload, activity: CrmWorkspacePayload['activities'][number]) {
+  return workspace.leads.find(lead => lead.companyName === activity.companyName || lead.primaryPersonName === activity.personName)
+}
+
+function isMeetingActivity(activity: CrmWorkspacePayload['activities'][number]) {
+  const text = `${activity.type ?? ''} ${activity.title ?? ''} ${activity.body ?? ''}`.toLowerCase()
+  return ['call', 'meeting', 'demo', 'decision', 'competitor', 'gong', 'security', 'budget', 'legal'].some(term => text.includes(term))
+}
+
+function signalTone(text: string) {
+  const lower = text.toLowerCase()
+  if (['risk', 'legal', 'security', 'competitor', 'gong', 'budget'].some(term => lower.includes(term))) return 'border-red-400/25 bg-red-400/10 text-red-100'
+  if (['decision', 'owner', 'timeline', 'friday'].some(term => lower.includes(term))) return 'border-yellow-300/25 bg-yellow-300/10 text-yellow-100'
+  return 'border-blue-300/20 bg-blue-300/10 text-blue-100'
 }
 
 function PageHeader({ view }: { view: WorkspaceViewName }) {
@@ -787,6 +808,162 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
   )
 }
 
+function ActivityComposer({
+  workspace,
+  actions,
+  defaultLeadId,
+  compact = false,
+}: {
+  workspace: CrmWorkspacePayload
+  actions: WorkspaceAction
+  defaultLeadId?: string
+  compact?: boolean
+}) {
+  const [leadId, setLeadId] = useState(defaultLeadId ?? workspace.leads[0]?.id ?? '')
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [type, setType] = useState('meeting')
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (defaultLeadId) setLeadId(defaultLeadId)
+  }, [defaultLeadId])
+
+  async function logActivity() {
+    if (!title.trim()) return
+    const lead = workspace.leads.find(candidate => candidate.id === leadId)
+    setBusy(true)
+    setNotice(null)
+    try {
+      await apiJson('/api/crm/activities', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId,
+          title,
+          body,
+          type,
+          companyName: lead?.companyName,
+          personName: lead?.primaryPersonName,
+        }),
+      })
+      setTitle('')
+      setBody('')
+      setNotice('Activity logged')
+      await actions.refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className={cn(pillSurfaceClass, 'bg-[#101316]', compact && 'border-white/8')}>
+      <CardHeader>
+        <CardTitle>{compact ? 'Log activity' : 'Log meeting'}</CardTitle>
+        <CardDescription>{compact ? 'Capture the latest customer signal.' : 'Add call notes, objections, decision criteria, and next steps.'}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {notice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{notice}</div> : null}
+        <div className="grid gap-3 md:grid-cols-2">
+          <select value={leadId} onChange={event => setLeadId(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+            {workspace.leads.map(lead => <option key={lead.id} value={lead.id}>{lead.companyName}</option>)}
+          </select>
+          <select value={type} onChange={event => setType(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
+            <option value="meeting">Meeting</option>
+            <option value="call">Call</option>
+            <option value="intent">Decision signal</option>
+            <option value="risk">Risk</option>
+            <option value="note">Note</option>
+          </select>
+        </div>
+        <Input value={title} onChange={event => setTitle(event.target.value)} placeholder="Meeting title or signal" className="rounded-full border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
+        <Textarea value={body} onChange={event => setBody(event.target.value)} placeholder="Notes, objections, competitor mentions, next steps..." className="min-h-28 rounded-[22px] border-white/10 bg-black/20 text-white placeholder:text-zinc-600" />
+        <Button type="button" onClick={() => void logActivity()} disabled={busy || !title.trim()} className="w-fit rounded-full bg-white text-black hover:bg-zinc-200">
+          <Plus className="size-4" />
+          {busy ? 'Logging...' : 'Log activity'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const meetingActivities = workspace.activities.filter(isMeetingActivity)
+  const meetingMessages = workspace.messages.meetings
+  const riskSignals = meetingActivities.filter(activity => signalTone(`${activity.title} ${activity.body}`) === 'border-red-400/25 bg-red-400/10 text-red-100')
+  const decisionSignals = meetingActivities.filter(activity => `${activity.title} ${activity.body}`.toLowerCase().includes('decision'))
+
+  return (
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-4">
+          <StatCard label="Meetings" value={`${meetingActivities.length}`} detail="Logged calls, demos, and customer conversations." icon={CalendarClock} />
+          <StatCard label="Transcript notes" value={`${meetingMessages.length}`} detail="Meeting-channel messages feeding deal context." icon={MessageCircle} />
+          <StatCard label="Risk signals" value={`${riskSignals.length}`} detail="Competitor, budget, legal, or security mentions." icon={ShieldAlert} />
+          <StatCard label="Decision signals" value={`${decisionSignals.length}`} detail="Owner, deadline, or close-window signals." icon={CheckCircle2} />
+        </div>
+
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Call intelligence feed</CardTitle>
+            <CardDescription>Meeting notes ranked as revenue evidence, tied directly back to the deal record.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {meetingActivities.map(activity => {
+              const lead = activityLead(workspace, activity)
+              const tone = signalTone(`${activity.title} ${activity.body}`)
+              return (
+                <button
+                  key={activity.id}
+                  type="button"
+                  onClick={() => lead ? actions.selectLead(lead.id) : undefined}
+                  className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[minmax(0,1fr)_auto] md:items-start')}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className={tone}>{activity.type ?? 'meeting'}</Badge>
+                      <p className="font-medium text-white">{activity.title}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-500">{activity.companyName ?? 'No account'} · {activity.personName ?? 'No contact'}</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300">{activity.body}</p>
+                    {lead?.nextStep ? <p className="mt-3 text-xs text-zinc-500">Next: {lead.nextStep}</p> : null}
+                  </div>
+                  <div className="text-right text-xs text-zinc-500">
+                    <p>{shortDate(activity.occurredAt)}</p>
+                    {lead ? <p className="mt-2 text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</p> : null}
+                  </div>
+                </button>
+              )
+            })}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid content-start gap-4">
+        <ActivityComposer workspace={workspace} actions={actions} />
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Meeting-channel transcript</CardTitle>
+            <CardDescription>Recent meeting-linked conversation snippets.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {meetingMessages.slice(-5).reverse().map(message => {
+              const lead = workspace.leads.find(candidate => candidate.id === message.leadId)
+              return (
+                <button key={message.id} type="button" onClick={() => lead ? actions.selectLead(lead.id) : undefined} className={cn(pillInsetClass, 'p-4 text-left transition hover:bg-white/[0.07]')}>
+                  <p className="text-sm font-semibold text-white">{lead?.companyName ?? 'Meeting'}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{message.from === 'rep' ? 'Rep' : 'Buyer'} · {shortDate(message.sentAt)}</p>
+                  <p className="mt-3 text-sm leading-6 text-zinc-300">{message.text}</p>
+                </button>
+              )
+            })}
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  )
+}
+
 function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const metrics = useWorkspaceMetrics(workspace)
   const maxValue = Math.max(...metrics.stages.map(stage => stage.value), 1)
@@ -1221,6 +1398,7 @@ function DealDetailSheet({
             </TabsContent>
 
             <TabsContent value="timeline" className="grid gap-4">
+              <ActivityComposer workspace={workspace} actions={{ selectLead: () => undefined, refresh: onRefresh }} defaultLeadId={leadId} compact />
               <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><MessageCircle className="size-4" /> Conversation history</CardTitle>
@@ -1337,6 +1515,7 @@ export default function WorkspaceView({ view }: { view: WorkspaceViewName }) {
       {view === 'deals' ? <DealsView workspace={workspace} actions={actions} /> : null}
       {view === 'accounts' ? <AccountsView workspace={workspace} actions={actions} /> : null}
       {view === 'tasks' ? <TasksView workspace={workspace} actions={actions} /> : null}
+      {view === 'meetings' ? <MeetingsView workspace={workspace} actions={actions} /> : null}
       {view === 'forecast' ? <ForecastView workspace={workspace} actions={actions} /> : null}
       {view === 'coach' ? <CoachView workspace={workspace} actions={actions} /> : null}
       {view === 'channels' ? <ChannelsView workspace={workspace} actions={actions} /> : null}
