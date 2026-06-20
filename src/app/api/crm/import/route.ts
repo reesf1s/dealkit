@@ -20,21 +20,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ rows: parsed.rows, errors: parsed.errors, template: CRM_IMPORT_TEMPLATE }, { status: 400 })
     }
 
-    if (body.dryRun === true) {
-      return NextResponse.json({ rows: parsed.rows, errors: [] })
-    }
-
     if (!parsed.rows.length) {
       return NextResponse.json({ error: 'No importable rows found', template: CRM_IMPORT_TEMPLATE }, { status: 400 })
     }
 
     if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
+      if (body.dryRun === true) return NextResponse.json({ rows: parsed.rows, errors: [] })
       const leads = parsed.rows.map(row => addDemoCrmLead(importRowToLeadInput(row)))
       return NextResponse.json({ imported: leads.length, leads, rows: parsed.rows, errors: [] })
     }
 
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (body.dryRun === true) {
+      return NextResponse.json({ rows: parsed.rows, errors: [] })
+    }
 
     const user = await currentUser()
     const email = user?.emailAddresses[0]?.emailAddress
