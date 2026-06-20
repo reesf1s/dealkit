@@ -2142,10 +2142,55 @@ function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
 
 function TeamView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const owners = useOwners(workspace)
+  const [selectedOwnerName, setSelectedOwnerName] = useState(owners[0]?.owner ?? '')
+  const [busyLeadId, setBusyLeadId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!owners.length) return
+    if (!owners.some(owner => owner.owner === selectedOwnerName)) setSelectedOwnerName(owners[0].owner)
+  }, [owners, selectedOwnerName])
+
   const totalPipeline = owners.reduce((sum, owner) => sum + owner.pipeline, 0)
   const totalWeighted = owners.reduce((sum, owner) => sum + owner.weighted, 0)
   const totalTasks = owners.reduce((sum, owner) => sum + owner.tasks, 0)
   const totalAtRisk = owners.reduce((sum, owner) => sum + owner.atRisk, 0)
+  const selectedOwner = owners.find(owner => owner.owner === selectedOwnerName) ?? owners[0]
+  const selectedDeals = selectedOwner ? [...selectedOwner.deals].sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0)) : []
+  const ownerTasks = selectedOwner
+    ? workspace.tasks.filter(task => selectedOwner.deals.some(lead => lead.companyName === task.companyName || lead.primaryPersonName === task.personName))
+    : []
+  const ownerActivities = selectedOwner
+    ? workspace.activities.filter(activity => selectedOwner.deals.some(lead => lead.companyName === activity.companyName || lead.primaryPersonName === activity.personName))
+    : []
+  const coachingDeals = selectedDeals
+    .filter(lead => lead.risk === 'hot' || Number(lead.probability ?? 0) < 45 || !lead.latestActivityAt)
+    .slice(0, 4)
+  const bestOwner = [...owners].sort((a, b) => b.weighted - a.weighted)[0]
+  const mostLoaded = [...owners].sort((a, b) => b.tasks - a.tasks)[0]
+
+  async function createManagerTask(lead: CrmLeadDto) {
+    setBusyLeadId(lead.id)
+    setNotice(null)
+    try {
+      await apiJson('/api/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: lead.id,
+          title: `Manager review: ${lead.companyName}`,
+          description: `Review ${lead.owner}'s plan for ${lead.companyName}. Confirm next step, buyer evidence, risk, and close path.`,
+          priority: lead.risk === 'hot' ? 'high' : 'medium',
+          dueAt: new Date(Date.now() + 86_400_000).toISOString(),
+          companyName: lead.companyName,
+          personName: lead.primaryPersonName,
+        }),
+      })
+      setNotice(`Manager review task created for ${lead.companyName}`)
+      await actions.refresh()
+    } finally {
+      setBusyLeadId(null)
+    }
+  }
 
   return (
     <section className="grid gap-4">
@@ -2156,62 +2201,215 @@ function TeamView({ workspace, actions }: { workspace: CrmWorkspacePayload; acti
         <StatCard label="Open work" value={`${totalTasks}`} detail={`${totalAtRisk} risky owner-owned deals.`} icon={ClipboardList} />
       </div>
 
-      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-        <CardHeader>
-          <CardTitle>Owner scorecards</CardTitle>
-          <CardDescription>Manager view for pipeline, forecast, risk, activity, and follow-up load.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          {owners.map(owner => (
-            <div key={owner.owner} className={cn(pillInsetClass, 'grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]')}>
-              <div>
-                <div className="flex items-center gap-3">
-                  <DealAvatar value={owner.owner} />
-                  <div>
-                    <p className="font-semibold text-white">{owner.owner}</p>
-                    <p className="text-xs text-zinc-500">{owner.deals.length} deals · {owner.tasks} tasks · {owner.activities} activities</p>
-                  </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid gap-4">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Manager cockpit</CardTitle>
+                  <CardDescription>Choose an owner, inspect their book, and create the next manager action from risk.</CardDescription>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
-                    <p className="text-zinc-500">Pipeline</p>
-                    <p className="mt-1 font-semibold text-white">{money(owner.pipeline)}</p>
-                  </div>
-                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
-                    <p className="text-zinc-500">Weighted</p>
-                    <p className="mt-1 font-semibold text-white">{money(owner.weighted)}</p>
-                  </div>
-                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
-                    <p className="text-zinc-500">At risk</p>
-                    <p className="mt-1 font-semibold text-white">{owner.atRisk}</p>
-                  </div>
-                  <div className="rounded-[18px] border border-white/10 bg-black/20 p-3">
-                    <p className="text-zinc-500">Won</p>
-                    <p className="mt-1 font-semibold text-white">{money(owner.won)}</p>
-                  </div>
-                </div>
+                {notice ? <Badge variant="outline" className="rounded-full border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-emerald-100">{notice}</Badge> : null}
               </div>
-
-              <div className="min-w-0">
-                <div className="grid gap-2">
-                  {owner.deals.slice(0, 4).map(lead => (
-                    <button key={lead.id} type="button" onClick={() => actions.selectLead(lead.id)} className="grid gap-2 rounded-[18px] border border-white/10 bg-black/20 p-3 text-left transition hover:bg-white/[0.06] md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-white">{lead.companyName}</p>
-                        <p className="mt-1 truncate text-xs text-zinc-500">{lead.stageName} · {lead.nextStep}</p>
+            </CardHeader>
+            <CardContent className="grid gap-4 lg:grid-cols-[270px_minmax(0,1fr)]">
+              <div className="grid gap-3">
+                {owners.map(owner => {
+                  const selected = owner.owner === selectedOwner?.owner
+                  const forecastCoverage = owner.pipeline ? Math.round((owner.weighted / owner.pipeline) * 100) : 0
+                  return (
+                    <button
+                      key={owner.owner}
+                      type="button"
+                      onClick={() => setSelectedOwnerName(owner.owner)}
+                      className={cn(
+                        pillInsetClass,
+                        'p-4 text-left transition',
+                        selected ? 'border-blue-300/30 bg-blue-400/10' : 'hover:bg-white/[0.04]',
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <DealAvatar value={owner.owner} />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-white">{owner.owner}</p>
+                          <p className="text-xs text-zinc-500">{owner.deals.length} deals · {owner.tasks} tasks</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
-                        <span className="text-sm font-semibold text-zinc-200">{money(Number(lead.valueAmount ?? 0))}</span>
+                      <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-[16px] border border-white/10 bg-black/20 p-2">
+                          <p className="text-zinc-500">Weighted</p>
+                          <p className="mt-1 font-semibold text-white">{money(owner.weighted)}</p>
+                        </div>
+                        <div className="rounded-[16px] border border-white/10 bg-black/20 p-2">
+                          <p className="text-zinc-500">Risk</p>
+                          <p className="mt-1 font-semibold text-white">{owner.atRisk}</p>
+                        </div>
+                        <div className="rounded-[16px] border border-white/10 bg-black/20 p-2">
+                          <p className="text-zinc-500">Cover</p>
+                          <p className="mt-1 font-semibold text-white">{forecastCoverage}%</p>
+                        </div>
                       </div>
                     </button>
-                  ))}
+                  )
+                })}
+              </div>
+
+              {selectedOwner ? (
+                <div className="grid gap-4">
+                  <div className={cn(pillInsetClass, 'grid gap-3 p-4 md:grid-cols-4')}>
+                    <div>
+                      <p className="text-xs text-zinc-500">Pipeline</p>
+                      <p className="mt-1 text-lg font-semibold text-white">{money(selectedOwner.pipeline)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500">Weighted</p>
+                      <p className="mt-1 text-lg font-semibold text-white">{money(selectedOwner.weighted)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500">Risk deals</p>
+                      <p className="mt-1 text-lg font-semibold text-white">{selectedOwner.atRisk}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500">Activity</p>
+                      <p className="mt-1 text-lg font-semibold text-white">{ownerActivities.length}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {selectedDeals.map(lead => {
+                      const leadTasks = ownerTasks.filter(task => task.companyName === lead.companyName || task.personName === lead.primaryPersonName).length
+                      const leadActivities = ownerActivities.filter(activity => activity.companyName === lead.companyName || activity.personName === lead.primaryPersonName).length
+                      const needsReview = lead.risk === 'hot' || Number(lead.probability ?? 0) < 45 || leadTasks > 2 || leadActivities === 0
+                      return (
+                        <button
+                          key={lead.id}
+                          type="button"
+                          onClick={() => actions.selectLead(lead.id)}
+                          className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.06] md:grid-cols-[minmax(0,1fr)_auto] md:items-center')}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate font-medium text-white">{lead.companyName}</p>
+                              <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                              {needsReview ? <Badge variant="outline" className="border-yellow-300/20 bg-yellow-300/10 text-yellow-100">review</Badge> : null}
+                            </div>
+                            <p className="mt-1 truncate text-xs text-zinc-500">{lead.stageName || lead.stage} · {lead.probability}% · {lead.nextStep}</p>
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-400">
+                              <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">{leadTasks} tasks</span>
+                              <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">{leadActivities} activities</span>
+                              <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">{shortDate(lead.expectedCloseDate)}</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-white">{money(Number(lead.valueAmount ?? 0))}</p>
+                            <p className="mt-1 text-xs text-zinc-500">{money(Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100))} weighted</p>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Coaching queue</CardTitle>
+              <CardDescription>Deals where a manager review can protect forecast quality or unblock execution.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              {coachingDeals.map(lead => (
+                <div key={lead.id} className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-white">{lead.companyName}</p>
+                      <p className="mt-1 truncate text-xs text-zinc-500">{lead.owner} · {lead.stageName || lead.stage}</p>
+                    </div>
+                    <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-300">{lead.nextStep || 'No next step captured.'}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => actions.selectLead(lead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                      Open deal
+                    </Button>
+                    <Button type="button" size="sm" onClick={() => void createManagerTask(lead)} disabled={busyLeadId === lead.id} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                      <Plus className="size-3.5" />
+                      {busyLeadId === lead.id ? 'Creating...' : 'Review task'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {!coachingDeals.length ? <p className="text-sm text-zinc-500">No coaching gaps for this owner.</p> : null}
+            </CardContent>
+          </Card>
+        </div>
+
+        <aside className="grid h-fit gap-4">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Team health</CardTitle>
+              <CardDescription>Fast read on concentration, workload, and management pressure.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                <p className="text-xs text-zinc-500">Top weighted owner</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <DealAvatar value={bestOwner?.owner} />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-white">{bestOwner?.owner ?? 'No owner'}</p>
+                    <p className="text-xs text-zinc-500">{money(bestOwner?.weighted ?? 0)} weighted</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                <p className="text-xs text-zinc-500">Highest workload</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <DealAvatar value={mostLoaded?.owner} />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-white">{mostLoaded?.owner ?? 'No owner'}</p>
+                    <p className="text-xs text-zinc-500">{mostLoaded?.tasks ?? 0} open tasks · {mostLoaded?.atRisk ?? 0} risks</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Manager prompt</p>
+                <p className="mt-3 text-sm leading-6 text-zinc-300">
+                  {selectedOwner
+                    ? `${selectedOwner.owner} has ${selectedOwner.atRisk} risky deals and ${ownerTasks.length} open tasks. Review the highest-value risk before the next forecast call.`
+                    : 'Select an owner to inspect their operating pressure.'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {selectedOwner ? (
+            <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+              <CardHeader>
+                <CardTitle>Recent owner activity</CardTitle>
+                <CardDescription>Logged evidence tied to this owner&apos;s book.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {ownerActivities.slice(0, 5).map(activity => {
+                  const lead = activityLead(workspace, activity)
+                  return (
+                    <button key={activity.id} type="button" onClick={() => lead ? actions.selectLead(lead.id) : undefined} className="rounded-[22px] border border-white/10 bg-black/20 p-4 text-left transition hover:bg-white/[0.06]">
+                      <div className="flex items-center justify-between gap-3">
+                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{activity.type ?? 'activity'}</Badge>
+                        <span className="text-xs text-zinc-500">{shortDate(activity.occurredAt)}</span>
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-white">{activity.title}</p>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-zinc-400">{activity.body}</p>
+                    </button>
+                  )
+                })}
+                {!ownerActivities.length ? <p className="text-sm text-zinc-500">No activity logged for this owner yet.</p> : null}
+              </CardContent>
+            </Card>
+          ) : null}
+        </aside>
+      </div>
     </section>
   )
 }
