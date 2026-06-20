@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'Halvex - LLM-first sales CRM for SME teams',
-  description: 'Run one sales cockpit for every channel: mail, social DMs, and notes in a markdown-style canvas backed by AI.',
+  description: 'Run one sales cockpit for email, LinkedIn, web leads, meetings, tasks, forecast, and AI-assisted deal execution.',
   openGraph: {
     title: 'Halvex',
     description: 'One lightweight platform for sales messaging, insights, and conversion.',
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 }
 
 const metrics = [
-  { label: 'Unified inbox', value: '4', detail: 'mail, social, web chat, notes' },
+  { label: 'Unified inbox', value: '4', detail: 'email, LinkedIn, web chat, meetings' },
   { label: 'AI recommendations', value: '21', detail: 'high-signal actions today' },
   { label: 'Reply quality', value: '89%', detail: 'draft acceptance rate' },
 ]
@@ -42,7 +42,7 @@ const rows = [
 ]
 
 const workflow = [
-  ['Inbox', 'Every channel lands in one row-ready operating table.', MessagesSquare],
+  ['Inbox', 'Every revenue channel lands in one row-ready operating table.', MessagesSquare],
   ['Deal read', 'Risk, probability, owner, and evidence stay visible.', TrendingUp],
   ['AI next step', 'Drafts and coaching are grounded in the selected deal.', Bot],
 ]

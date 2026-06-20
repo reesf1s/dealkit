@@ -11,7 +11,7 @@ const settings = [
   {
     title: 'Channel status',
     description: 'Mail, LinkedIn, meetings, and web leads are available in this build.',
-    detail: 'LinkedIn, WhatsApp, and more OAuth providers can plug into the same channel layer next.',
+    detail: 'Gmail, Microsoft 365, LinkedIn Sales Navigator, meeting capture, and web forms fit the same channel layer next.',
     icon: PlugZap,
   },
   {

@@ -99,9 +99,6 @@ export type ActivityMutationInput = {
 }
 
 const channelIds = ['mail', 'linkedin', 'webchat', 'meetings'] as const
-const legacyChannelAliases: Record<string, ChannelId> = {
-  instagram: 'meetings',
-}
 
 const seedChannels = [
   { provider: 'mail', name: 'Gmail', connected: true, status: 'connected' },
@@ -113,7 +110,7 @@ const seedChannels = [
 function normalizeChannel(value: unknown): ChannelId {
   const channel = String(value ?? 'mail')
   if (channelIds.includes(channel as ChannelId)) return channel as ChannelId
-  return legacyChannelAliases[channel] ?? 'mail'
+  return 'mail'
 }
 
 function date(daysFromNow: number) {

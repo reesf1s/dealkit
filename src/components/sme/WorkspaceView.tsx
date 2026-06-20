@@ -40,7 +40,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { pillInsetClass, pillSurfaceClass } from '@/components/sme/halvex-system'
 import { cn } from '@/lib/utils'
 
-type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'coach' | 'channels'
+type WorkspaceViewName = 'dashboard' | 'inbox' | 'deals' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'reports' | 'coach' | 'channels'
 
 type WorkspaceAction = {
   selectLead: (leadId: string) => void
@@ -108,6 +108,11 @@ const VIEW_COPY: Record<WorkspaceViewName, { eyebrow: string; title: string; des
     eyebrow: 'Forecast',
     title: 'Weighted forecast',
     description: 'Understand committed value, stage mix, and the gaps that change the number.',
+  },
+  reports: {
+    eyebrow: 'Reports',
+    title: 'Revenue intelligence',
+    description: 'Funnel, risk concentration, activity coverage, and channel quality for management review.',
   },
   coach: {
     eyebrow: 'AI coach',
@@ -278,6 +283,77 @@ function useOwners(workspace: CrmWorkspacePayload) {
 
     return [...owners.values()].sort((a, b) => b.weighted - a.weighted)
   }, [workspace])
+}
+
+function useReports(workspace: CrmWorkspacePayload, now: number) {
+  return useMemo(() => {
+    const leads = workspace.leads
+    const totalPipeline = leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+    const weightedPipeline = leads.reduce((sum, lead) => sum + Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100), 0)
+    const activeLeads = leads.filter(lead => lead.status !== 'won' && lead.status !== 'lost')
+    const riskyLeads = activeLeads.filter(lead => lead.risk === 'hot' || Number(lead.probability ?? 0) < 45)
+    const staleLeads = activeLeads.filter(lead => {
+      if (!lead.latestActivityAt) return true
+      if (!now) return false
+      return now - new Date(lead.latestActivityAt).getTime() > 7 * 86_400_000
+    })
+    const commit = activeLeads.filter(lead => Number(lead.probability ?? 0) >= 70)
+    const bestCase = activeLeads.filter(lead => Number(lead.probability ?? 0) >= 45 && Number(lead.probability ?? 0) < 70)
+    const openPipeline = activeLeads.filter(lead => Number(lead.probability ?? 0) < 45)
+    const messages = Object.values(workspace.messages).flat()
+
+    const stageRows = [...leads.reduce((map, lead) => {
+      const stage = lead.stageName || lead.stage || 'Unstaged'
+      const current = map.get(stage) ?? { stage, deals: 0, pipeline: 0, weighted: 0, risk: 0, probability: 0 }
+      current.deals += 1
+      current.pipeline += Number(lead.valueAmount ?? 0)
+      current.weighted += Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100)
+      current.risk += lead.risk === 'hot' || Number(lead.probability ?? 0) < 45 ? 1 : 0
+      current.probability += Number(lead.probability ?? 0)
+      map.set(stage, current)
+      return map
+    }, new Map<string, { stage: string; deals: number; pipeline: number; weighted: number; risk: number; probability: number }>()).values()]
+      .map(row => ({ ...row, avgProbability: Math.round(row.probability / Math.max(row.deals, 1)) }))
+      .sort((a, b) => b.pipeline - a.pipeline)
+
+    const channelRows = workspace.channels.map(channel => {
+      const channelLeads = leads.filter(lead => lead.channel === channel.id)
+      const channelMessages = workspace.messages[channel.id] ?? []
+      const pipeline = channelLeads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+      const weighted = channelLeads.reduce((sum, lead) => sum + Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100), 0)
+      return {
+        id: channel.id,
+        name: channel.name,
+        connected: channel.connected,
+        deals: channelLeads.length,
+        messages: channelMessages.length,
+        pipeline,
+        weighted,
+      }
+    }).sort((a, b) => b.pipeline - a.pipeline)
+
+    const coverageRows = activeLeads.map(lead => {
+      const leadMessagesCount = leadMessages(workspace, lead.id).length
+      const leadTasks = workspace.tasks.filter(task => task.companyName === lead.companyName || task.personName === lead.primaryPersonName).length
+      const leadActivities = workspace.activities.filter(activity => activity.companyName === lead.companyName || activity.personName === lead.primaryPersonName).length
+      const coverage = leadMessagesCount + leadTasks + leadActivities
+      return { lead, messages: leadMessagesCount, tasks: leadTasks, activities: leadActivities, coverage }
+    }).sort((a, b) => a.coverage - b.coverage)
+
+    return {
+      totalPipeline,
+      weightedPipeline,
+      riskyLeads,
+      staleLeads,
+      commit,
+      bestCase,
+      openPipeline,
+      messages,
+      stageRows,
+      channelRows,
+      coverageRows,
+    }
+  }, [workspace, now])
 }
 
 function activityLead(workspace: CrmWorkspacePayload, activity: CrmWorkspacePayload['activities'][number]) {
@@ -1277,6 +1353,140 @@ function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
   )
 }
 
+function ReportsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const [now, setNow] = useState(0)
+  useEffect(() => {
+    setNow(Date.now())
+  }, [])
+  const reports = useReports(workspace, now)
+  const maxStage = Math.max(...reports.stageRows.map(row => row.pipeline), 1)
+  const valueOf = (leads: CrmLeadDto[]) => leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+
+  return (
+    <section className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Pipeline coverage" value={money(reports.totalPipeline)} detail={`${reports.stageRows.length} active stages in management review.`} icon={TrendingUp} />
+        <StatCard label="Weighted number" value={money(reports.weightedPipeline)} detail="Probability-adjusted revenue confidence." icon={Gauge} />
+        <StatCard label="Risk concentration" value={money(valueOf(reports.riskyLeads))} detail={`${reports.riskyLeads.length} deals with low confidence or hot risk.`} icon={ShieldAlert} />
+        <StatCard label="Activity coverage" value={`${reports.messages.length + workspace.activities.length}`} detail={`${workspace.tasks.length} open tasks tied to sales execution.`} icon={MessageCircle} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Funnel report</CardTitle>
+            <CardDescription>Stage quality, conversion proxy, weighted value, and risk concentration.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {reports.stageRows.map(row => (
+              <div key={row.stage} className={cn(pillInsetClass, 'p-4')}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-white">{row.stage}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{row.deals} deals · {row.avgProbability}% average probability · {row.risk} risky</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-white">{money(row.pipeline)}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{money(row.weighted)} weighted</p>
+                  </div>
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="h-full rounded-full bg-blue-400" style={{ width: `${Math.max(8, (row.pipeline / maxStage) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Forecast quality</CardTitle>
+            <CardDescription>Manager-ready view of commit, upside, and pipeline hygiene.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {[
+              { label: 'Commit', leads: reports.commit, tone: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' },
+              { label: 'Best case', leads: reports.bestCase, tone: 'border-yellow-300/20 bg-yellow-300/10 text-yellow-100' },
+              { label: 'Pipeline', leads: reports.openPipeline, tone: 'border-blue-300/20 bg-blue-300/10 text-blue-100' },
+              { label: 'Stale', leads: reports.staleLeads, tone: 'border-red-300/20 bg-red-300/10 text-red-100' },
+            ].map(item => (
+              <div key={item.label} className={cn(pillInsetClass, 'flex items-center justify-between gap-3 p-4')}>
+                <div>
+                  <Badge variant="outline" className={item.tone}>{item.label}</Badge>
+                  <p className="mt-3 text-sm text-zinc-400">{item.leads.length} deals</p>
+                </div>
+                <p className="text-lg font-semibold text-white">{money(valueOf(item.leads))}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Channel performance</CardTitle>
+            <CardDescription>Revenue channels only: email, LinkedIn, web chat, and meetings.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="text-zinc-500">Channel</TableHead>
+                  <TableHead className="text-zinc-500">Deals</TableHead>
+                  <TableHead className="text-zinc-500">Messages</TableHead>
+                  <TableHead className="text-zinc-500">Pipeline</TableHead>
+                  <TableHead className="text-zinc-500">Weighted</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reports.channelRows.map(row => (
+                  <TableRow key={row.id} className="border-white/8 hover:bg-white/[0.04]">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={row.connected ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-zinc-500/20 bg-zinc-500/10 text-zinc-300'}>
+                          {row.connected ? 'Live' : 'Pending'}
+                        </Badge>
+                        <span className="font-medium text-white">{row.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-zinc-300">{row.deals}</TableCell>
+                    <TableCell className="text-zinc-300">{row.messages}</TableCell>
+                    <TableCell className="text-zinc-300">{money(row.pipeline)}</TableCell>
+                    <TableCell className="text-zinc-300">{money(row.weighted)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Coverage gaps</CardTitle>
+            <CardDescription>Deals with the thinnest evidence, activity, and task coverage.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {reports.coverageRows.slice(0, 6).map(row => (
+              <button key={row.lead.id} type="button" onClick={() => actions.selectLead(row.lead.id)} className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[minmax(0,1fr)_auto] md:items-center')}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{row.lead.companyName}</p>
+                  <p className="mt-1 truncate text-xs text-zinc-500">{row.lead.nextStep}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.messages} msgs</Badge>
+                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.activities} acts</Badge>
+                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.tasks} tasks</Badge>
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  )
+}
+
 function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const rankedLeads = [...workspace.leads]
     .sort((a, b) => (
@@ -1770,6 +1980,7 @@ export default function WorkspaceView({ view }: { view: WorkspaceViewName }) {
       {view === 'meetings' ? <MeetingsView workspace={workspace} actions={actions} /> : null}
       {view === 'team' ? <TeamView workspace={workspace} actions={actions} /> : null}
       {view === 'forecast' ? <ForecastView workspace={workspace} actions={actions} /> : null}
+      {view === 'reports' ? <ReportsView workspace={workspace} actions={actions} /> : null}
       {view === 'coach' ? <CoachView workspace={workspace} actions={actions} /> : null}
       {view === 'channels' ? <ChannelsView workspace={workspace} actions={actions} /> : null}
       <DealDetailSheet
