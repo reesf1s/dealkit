@@ -634,6 +634,37 @@ export async function createCrmTask(input: { workspaceId: string; data: TaskMuta
   return taskToRecovery(task)
 }
 
+export async function completeCrmTask(input: { workspaceId: string; taskId: string }) {
+  const [task] = await db
+    .select()
+    .from(crmTasks)
+    .where(and(eq(crmTasks.id, input.taskId), eq(crmTasks.workspaceId, input.workspaceId)))
+    .limit(1)
+
+  if (!task) return null
+
+  await db
+    .delete(crmTasks)
+    .where(and(eq(crmTasks.id, input.taskId), eq(crmTasks.workspaceId, input.workspaceId)))
+
+  if (task.leadId) {
+    const [lead] = await db
+      .select()
+      .from(crmLeads)
+      .where(and(eq(crmLeads.id, task.leadId), eq(crmLeads.workspaceId, input.workspaceId)))
+      .limit(1)
+
+    if (lead) {
+      await db
+        .update(crmLeads)
+        .set({ openTaskCount: Math.max(0, lead.openTaskCount - 1), updatedAt: new Date() })
+        .where(and(eq(crmLeads.id, lead.id), eq(crmLeads.workspaceId, input.workspaceId)))
+    }
+  }
+
+  return taskToRecovery(task)
+}
+
 export async function createCrmActivity(input: { workspaceId: string; data: ActivityMutationInput }) {
   const data = cleanActivityInput(input.data)
   let lead: CrmLeadRow | undefined
@@ -842,6 +873,23 @@ export function addDemoCrmTask(input: TaskMutationInput) {
   if (lead) {
     workspace.leads = workspace.leads.map(candidate => (
       candidate.id === lead.id ? { ...candidate, openTaskCount: Number(candidate.openTaskCount ?? 0) + 1 } : candidate
+    ))
+  }
+  refreshDemoWorkspace(workspace)
+  return task
+}
+
+export function completeDemoCrmTask(taskId: string) {
+  const workspace = getDemoCrmWorkspaceState()
+  const task = workspace.tasks.find(candidate => candidate.id === taskId)
+  if (!task) return null
+
+  workspace.tasks = workspace.tasks.filter(candidate => candidate.id !== taskId)
+  if (task.companyName) {
+    workspace.leads = workspace.leads.map(candidate => (
+      candidate.companyName === task.companyName
+        ? { ...candidate, openTaskCount: Math.max(0, Number(candidate.openTaskCount ?? 0) - 1) }
+        : candidate
     ))
   }
   refreshDemoWorkspace(workspace)

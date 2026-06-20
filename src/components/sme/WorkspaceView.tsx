@@ -687,6 +687,7 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const leadByCompany = new Map(workspace.leads.map(lead => [lead.companyName, lead]))
@@ -725,6 +726,18 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
     }
   }
 
+  async function completeTask(taskId: string) {
+    setCompletingTaskId(taskId)
+    setNotice(null)
+    try {
+      await apiJson(`/api/crm/tasks/${taskId}`, { method: 'DELETE' })
+      setNotice('Task completed')
+      await actions.refresh()
+    } finally {
+      setCompletingTaskId(null)
+    }
+  }
+
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="grid gap-4">
@@ -759,11 +772,9 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
             {filteredTasks.map(task => {
               const lead = task.companyName ? leadByCompany.get(task.companyName) : undefined
               return (
-                <button
+                <div
                   key={task.id}
-                  type="button"
-                  onClick={() => lead ? actions.selectLead(lead.id) : undefined}
-                  className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[minmax(0,1fr)_auto] md:items-center')}
+                  className={cn(pillInsetClass, 'grid gap-3 p-4 transition hover:bg-white/[0.04] md:grid-cols-[minmax(0,1fr)_auto] md:items-center')}
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -775,11 +786,22 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
                     <p className="mt-1 text-xs text-zinc-500">{task.companyName ?? 'No account'} · {task.personName ?? 'No contact'}</p>
                     <p className="mt-3 text-sm leading-6 text-zinc-300">{task.description}</p>
                   </div>
-                  <div className="text-right text-xs text-zinc-500">
-                    <p>Due {shortDate(task.dueAt)}</p>
-                    {lead ? <p className="mt-2 text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</p> : null}
+                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                    <div className="min-w-24 text-right text-xs text-zinc-500">
+                      <p>Due {shortDate(task.dueAt)}</p>
+                      {lead ? <p className="mt-2 text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</p> : null}
+                    </div>
+                    {lead ? (
+                      <Button type="button" variant="outline" size="sm" onClick={() => actions.selectLead(lead.id)} className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                        Open deal
+                      </Button>
+                    ) : null}
+                    <Button type="button" size="sm" onClick={() => void completeTask(task.id)} disabled={completingTaskId === task.id} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                      <CheckCircle2 className="size-3.5" />
+                      {completingTaskId === task.id ? 'Completing...' : 'Complete'}
+                    </Button>
                   </div>
-                </button>
+                </div>
               )
             })}
           </CardContent>
@@ -1270,6 +1292,18 @@ function DealDetailSheet({
     }
   }
 
+  async function completeTask(taskId: string) {
+    setBusy(`complete:${taskId}`)
+    setNotice(null)
+    try {
+      await apiJson(`/api/crm/tasks/${taskId}`, { method: 'DELETE' })
+      await onRefresh()
+      setNotice('Task completed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function generateDraft() {
     setBusy('draft')
     setNotice(null)
@@ -1452,12 +1486,18 @@ function DealDetailSheet({
                   </div>
                   <div className="grid gap-3">
                     {tasks.map(task => (
-                      <div key={task.id} className={cn(pillInsetClass, 'flex items-start justify-between gap-3 p-4')}>
+                      <div key={task.id} className={cn(pillInsetClass, 'flex flex-wrap items-start justify-between gap-3 p-4')}>
                         <div>
                           <p className="text-sm font-semibold text-white">{task.title}</p>
                           <p className="mt-1 text-xs leading-5 text-zinc-500">{task.description}</p>
                         </div>
-                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{shortDate(task.dueAt)}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{shortDate(task.dueAt)}</Badge>
+                          <Button type="button" size="sm" onClick={() => void completeTask(task.id)} disabled={busy === `complete:${task.id}`} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                            <CheckCircle2 className="size-3.5" />
+                            {busy === `complete:${task.id}` ? 'Completing...' : 'Complete'}
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
