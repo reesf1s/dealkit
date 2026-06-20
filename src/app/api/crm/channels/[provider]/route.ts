@@ -4,6 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { setChannelConnection, updateDemoChannelConnection, type ChannelId } from '@/lib/sme-crm'
+import { logWorkspaceEvent } from '@/lib/audit'
 
 const channels = new Set(['mail', 'linkedin', 'webchat', 'meetings'])
 
@@ -28,6 +29,16 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ provi
     const channel = await setChannelConnection({ workspaceId, provider: provider as ChannelId, connected: body.connected })
 
     if (!channel) return NextResponse.json({ error: 'Channel not found' }, { status: 404 })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: body.connected ? 'crm.channel.connected' : 'crm.channel.paused',
+      metadata: {
+        provider: channel.id,
+        name: channel.name,
+        connected: channel.connected,
+      },
+    })
     return NextResponse.json({ channel })
   } catch (error) {
     console.error('[PATCH /api/crm/channels/[provider]]', error)

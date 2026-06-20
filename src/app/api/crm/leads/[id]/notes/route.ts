@@ -4,6 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { saveDemoCrmLeadNotes, updateLeadNotes } from '@/lib/sme-crm'
+import { logWorkspaceEvent } from '@/lib/audit'
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -29,6 +30,16 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const lead = await updateLeadNotes({ workspaceId, leadId: id, notes: body.notes })
 
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: 'crm.lead.notes_updated',
+      metadata: {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        notesLength: body.notes.length,
+      },
+    })
     return NextResponse.json({ lead })
   } catch (error) {
     console.error('[PATCH /api/crm/leads/[id]/notes]', error)

@@ -4,6 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { addDemoCrmActivity, createCrmActivity, type ActivityMutationInput } from '@/lib/sme-crm'
+import { logWorkspaceEvent } from '@/lib/audit'
 
 function activityInput(body: Record<string, unknown>): ActivityMutationInput {
   return {
@@ -33,6 +34,17 @@ export async function POST(req: NextRequest) {
     const email = user?.emailAddresses[0]?.emailAddress
     const { workspaceId } = await getWorkspaceContext(userId, email)
     const activity = await createCrmActivity({ workspaceId, data })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: 'crm.activity.created',
+      metadata: {
+        activityId: activity.id,
+        title: activity.title,
+        companyName: activity.companyName,
+        activityType: activity.type,
+      },
+    })
 
     return NextResponse.json({ activity })
   } catch (error) {

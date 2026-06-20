@@ -4,6 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { addDemoCrmLead, createCrmLead, type LeadMutationInput } from '@/lib/sme-crm'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { logWorkspaceEvent } from '@/lib/audit'
 
 function leadInput(body: Record<string, unknown>): LeadMutationInput {
   return {
@@ -38,6 +39,19 @@ export async function POST(req: NextRequest) {
     const email = user?.emailAddresses[0]?.emailAddress
     const { workspaceId } = await getWorkspaceContext(userId, email)
     const lead = await createCrmLead({ workspaceId, ownerId: userId, data })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: 'crm.lead.created',
+      metadata: {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        stage: lead.stageName,
+        valueAmount: lead.valueAmount,
+        probability: lead.probability,
+        risk: lead.risk,
+      },
+    })
 
     return NextResponse.json({ lead })
   } catch (error) {

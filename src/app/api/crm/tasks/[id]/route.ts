@@ -4,6 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { completeCrmTask, completeDemoCrmTask } from '@/lib/sme-crm'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { logWorkspaceEvent } from '@/lib/audit'
 
 export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -24,6 +25,16 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     const task = await completeCrmTask({ workspaceId, taskId: id })
 
     if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: 'crm.task.completed',
+      metadata: {
+        taskId: task.id,
+        title: task.title,
+        companyName: task.companyName,
+      },
+    })
     return NextResponse.json({ task })
   } catch (error) {
     console.error('[DELETE /api/crm/tasks/[id]]', error)

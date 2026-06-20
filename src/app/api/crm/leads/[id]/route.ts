@@ -4,6 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { updateCrmLead, updateDemoCrmLead, type LeadMutationInput } from '@/lib/sme-crm'
+import { logWorkspaceEvent } from '@/lib/audit'
 
 function leadInput(body: Record<string, unknown>): LeadMutationInput {
   return {
@@ -43,6 +44,20 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const lead = await updateCrmLead({ workspaceId, leadId: id, data })
 
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: 'crm.lead.updated',
+      metadata: {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        stage: lead.stageName,
+        status: lead.status,
+        valueAmount: lead.valueAmount,
+        probability: lead.probability,
+        risk: lead.risk,
+      },
+    })
     return NextResponse.json({ lead })
   } catch (error) {
     console.error('[PATCH /api/crm/leads/[id]]', error)

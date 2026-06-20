@@ -4,6 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { addDemoCrmMessage, createCrmMessage, type ChannelId } from '@/lib/sme-crm'
+import { logWorkspaceEvent } from '@/lib/audit'
 
 const channels = new Set(['mail', 'linkedin', 'webchat', 'meetings'])
 
@@ -44,6 +45,17 @@ export async function POST(req: NextRequest) {
     })
 
     if (!message) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    await logWorkspaceEvent({
+      workspaceId,
+      userId,
+      type: 'crm.message.sent',
+      metadata: {
+        messageId: message.id,
+        leadId: message.leadId,
+        channel: message.channel,
+        from: message.from,
+      },
+    })
     return NextResponse.json({ message })
   } catch (error) {
     console.error('[POST /api/crm/messages]', error)
