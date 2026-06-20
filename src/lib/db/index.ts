@@ -2,10 +2,10 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-// Use a dummy URL if DATABASE_URL is not set — postgres is lazy and won't
+// Use a local fallback URL if DATABASE_URL is not set — postgres is lazy and won't
 // actually connect until a query is executed, so this prevents a crash at
 // module load time. API routes catch the resulting query error and return 503.
-const connectionString = (process.env.DATABASE_URL ?? 'postgresql://placeholder:placeholder@placeholder/placeholder').trim()
+const connectionString = (process.env.DATABASE_URL ?? 'postgresql://halvex:halvex@localhost/halvex').trim()
 
 const isSupabase = connectionString.includes('supabase.co') || connectionString.includes('pooler.supabase.com')
 // Supabase pgBouncer pooler (port 6543) doesn't support prepared statements

@@ -1,51 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/webhooks/stripe',
-  '/api/webhooks/slack(.*)',
-  '/share(.*)',
 ])
-
-const legacyDashboardRedirects: Array<[RegExp, string]> = [
-  [/^\/analytics(?:\/.*)?$/, '/reports'],
-  [/^\/activity(?:\/.*)?$/, '/home'],
-  [/^\/assistant(?:\/.*)?$/, '/home'],
-  [/^\/automations(?:\/.*)?$/, '/home'],
-  [/^\/calendar(?:\/.*)?$/, '/settings?section=integrations'],
-  [/^\/case-studies(?:\/.*)?$/, '/home'],
-  [/^\/chat(?:\/.*)?$/, '/home'],
-  [/^\/collateral(?:\/.*)?$/, '/home'],
-  [/^\/company(?:\/.*)?$/, '/companies'],
-  [/^\/competitors(?:\/.*)?$/, '/home'],
-  [/^\/connections(?:\/.*)?$/, '/settings?section=integrations'],
-  [/^\/contacts(?:\/.*)?$/, '/people'],
-  [/^\/dashboard(?:\/.*)?$/, '/home'],
-  [/^\/intelligence(?:\/.*)?$/, '/deals'],
-  [/^\/inbox(?:\/.*)?$/, '/home'],
-  [/^\/models(?:\/.*)?$/, '/home'],
-  [/^\/onboarding(?:\/.*)?$/, '/home'],
-  [/^\/pipeline(?:\/.*)?$/, '/deals'],
-  [/^\/pipelines(?:\/.*)?$/, '/deals'],
-  [/^\/playbook(?:\/.*)?$/, '/home'],
-  [/^\/product-gaps(?:\/.*)?$/, '/home'],
-  [/^\/settings\/unmatched-emails(?:\/.*)?$/, '/home'],
-  [/^\/today(?:\/.*)?$/, '/home'],
-  [/^\/workflows(?:\/.*)?$/, '/home'],
-]
-
-function redirectedLegacyUrl(request: Request) {
-  const url = new URL(request.url)
-  const match = legacyDashboardRedirects.find(([pattern]) => pattern.test(url.pathname))
-  if (!match) return null
-  const target = new URL(match[1], url.origin)
-  url.pathname = target.pathname
-  url.search = target.search
-  return url
-}
 
 // If Clerk keys are missing, skip auth middleware so the landing page works
 const clerkConfigured =
@@ -54,8 +15,6 @@ const clerkConfigured =
 
 export default clerkConfigured
   ? clerkMiddleware(async (auth, request) => {
-      const redirectUrl = redirectedLegacyUrl(request)
-      if (redirectUrl) return NextResponse.redirect(redirectUrl)
       if (!isPublicRoute(request)) {
         if (request.nextUrl.pathname.startsWith('/api')) {
           await auth.protect()
@@ -66,9 +25,7 @@ export default clerkConfigured
         })
       }
     })
-  : (request: NextRequest) => {
-      const redirectUrl = redirectedLegacyUrl(request)
-      if (redirectUrl) return NextResponse.redirect(redirectUrl)
+  : () => {
       return NextResponse.next()
     }
 

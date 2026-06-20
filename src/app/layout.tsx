@@ -1,25 +1,30 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Inter, Poppins, Source_Code_Pro } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
-import { Toaster } from '@/components/shared/Toast'
-import CookieBanner from '@/components/shared/CookieBanner'
-import { ThemeProvider } from '@/components/layout/ThemeContext'
-import Script from 'next/script'
+import { ThemeProvider } from '@/components/theme-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import './globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const titleFont = Poppins({
+  variable: '--font-title',
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+})
+
+const bodyFont = Inter({
+  variable: '--font-body',
   subsets: ['latin'],
 })
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const monoFont = Source_Code_Pro({
+  variable: '--font-code',
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
 })
 
 export const metadata: Metadata = {
   title: 'Halvex',
-  description: 'Autonomous sales intelligence',
+  description: 'An LLM-first sales CRM for SME teams with a unified inbox and conversational intelligence.',
 }
 
 export default function RootLayout({
@@ -28,33 +33,30 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <ClerkProvider
+      localization={{
+        signIn: {
+          start: {
+            title: 'Sign in to Halvex',
+            subtitle: 'Use your workspace account to continue.',
+          },
+        },
+        signUp: {
+          start: {
+            title: 'Create your Halvex account',
+            subtitle: 'Start with a workspace login.',
+          },
+        },
+      }}
+    >
+      <html lang="en" className={`${titleFont.variable} ${bodyFont.variable} ${monoFont.variable}`} suppressHydrationWarning>
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         </head>
         <body className="antialiased">
-          <Script
-            id="mixpanel-lib"
-            src="https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js"
-            strategy="afterInteractive"
-          />
-          <Script id="mixpanel-init" strategy="afterInteractive">{`
-            if (window.mixpanel && typeof window.mixpanel.init === 'function') {
-              window.mixpanel.init('4ddd35723e1b279d2c5f68363becac2f', {
-                track_pageview: "url-with-path",
-                persistence: "localStorage",
-                record_sessions_percent: 10,
-                record_block_selector: "[data-mp-block]",
-              });
-            }
-          `}</Script>
           <ThemeProvider>
-            <Toaster>
-              {children}
-            </Toaster>
-            <CookieBanner />
+            <TooltipProvider>{children}</TooltipProvider>
           </ThemeProvider>
         </body>
       </html>

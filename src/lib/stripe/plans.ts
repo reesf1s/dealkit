@@ -7,25 +7,31 @@ import type { Plan, PlanDefinition, PlanLimits } from '@/types'
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: {
-    products: 1,
-    competitors: 1,   // 1 competitor — forces upsell fast
-    caseStudies: 2,   // very low to show value gap
-    dealLogs: 5,      // 5 deals then must upgrade
-    collateral: 3,    // 3 AI pieces then must upgrade
+    workspaces: 1,
+    members: 3,
+    companies: 50,
+    people: 250,
+    deals: 100,
+    tasks: 500,
+    exports: true,
   },
   starter: {
-    products: 5,
-    competitors: 15,
-    caseStudies: null,   // unlimited
-    dealLogs: null,      // unlimited
-    collateral: null,    // unlimited
+    workspaces: 1,
+    members: 10,
+    companies: null,
+    people: null,
+    deals: null,
+    tasks: null,
+    exports: true,
   },
   pro: {
-    products: null,      // unlimited
-    competitors: null,   // unlimited
-    caseStudies: null,   // unlimited
-    dealLogs: null,      // unlimited
-    collateral: null,    // unlimited
+    workspaces: null,
+    members: null,
+    companies: null,
+    people: null,
+    deals: null,
+    tasks: null,
+    exports: true,
   },
 }
 
@@ -41,52 +47,50 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     priceMonthly: 0,
     priceId: null,
     limits: PLAN_LIMITS.free,
-        features: [
-      '1 product',
-      '1 competitor',
-      'Up to 2 case studies',
-      'Up to 5 deal logs',
-      'Up to 3 AI-generated collateral pieces',
-      'Battlecards & one-pagers',
+    features: [
+      '1 workspace',
+      'Up to 3 members',
+      'Up to 50 companies',
+      'Up to 250 contacts',
+      'Up to 100 leads',
+      'Leads, notes, messages, and tasks',
       'Community support',
     ],
   },
   starter: {
     id: 'starter',
     name: 'Starter',
-    description: 'For growing sales teams that need more firepower.',
+    description: 'For SME sales teams ready to centralise follow-up.',
     priceMonthly: 79,
     priceId: process.env.STRIPE_STARTER_PRICE_ID ?? null,
     limits: PLAN_LIMITS.starter,
-        features: [
-      '5 products',
-      'Up to 15 competitors',
-      'Unlimited case studies',
-      'Unlimited deal logs',
-      'Unlimited AI-generated collateral',
-      'All collateral types (incl. talk tracks & email sequences)',
-      'AI meeting prep & deal scoring',
-      'Export to DOCX',
+    features: [
+      '1 workspace',
+      'Up to 10 members',
+      'Unlimited companies',
+      'Unlimited contacts',
+      'Unlimited leads',
+      'Markdown lead canvas',
+      'Unified inbox workspace',
+      'Stripe billing portal',
       'Email support',
     ],
   },
   pro: {
     id: 'pro',
     name: 'Pro',
-    description: 'For high-velocity teams that need everything, unlimited.',
+    description: 'For high-velocity sales teams running AI-assisted pipeline work.',
     priceMonthly: 149,
     priceId: process.env.STRIPE_PRO_PRICE_ID ?? null,
     limits: PLAN_LIMITS.pro,
     features: [
-      'Unlimited products',
-      'Unlimited competitors',
-      'Unlimited case studies',
-      'Unlimited deal logs',
-      'Unlimited AI-generated collateral',
-      'All collateral types',
-      'Export to DOCX & PDF',
-      'Premium GPT-5.5 reasoning for deeper deal intelligence',
-      'Dedicated Slack support',
+      'Unlimited workspaces',
+      'Unlimited members',
+      'Unlimited companies',
+      'Unlimited contacts',
+      'Unlimited leads',
+      'Advanced workspace administration',
+      'Priority support',
       'Early access to new features',
     ],
   },
