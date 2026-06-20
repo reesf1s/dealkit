@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   Home,
   MessagesSquare,
+  PhoneCall,
   PlugZap,
   Settings,
   Sparkles,
@@ -37,7 +38,7 @@ import { cn } from '@/lib/utils'
 type NavLink = {
   href: string
   label: string
-  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'reports' | 'import' | 'automation' | 'coaching' | 'integrations' | 'settings' | 'billing'
+  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'call-review' | 'team' | 'forecast' | 'reports' | 'import' | 'automation' | 'coaching' | 'integrations' | 'settings' | 'billing'
 }
 
 const navigation: NavLink[] = [
@@ -47,6 +48,7 @@ const navigation: NavLink[] = [
   { href: '/accounts', label: 'Accounts', icon: 'accounts' },
   { href: '/tasks', label: 'Tasks', icon: 'tasks' },
   { href: '/meetings', label: 'Meetings', icon: 'meetings' },
+  { href: '/call-review', label: 'Call review', icon: 'call-review' },
   { href: '/team', label: 'Team', icon: 'team' },
   { href: '/forecast', label: 'Forecast', icon: 'forecast' },
   { href: '/reports', label: 'Reports', icon: 'reports' },
@@ -76,6 +78,8 @@ function NavIcon({ icon }: { icon: NavLink['icon'] }) {
       return <CheckSquare {...props} />
     case 'meetings':
       return <CalendarDays {...props} />
+    case 'call-review':
+      return <PhoneCall {...props} />
     case 'team':
       return <Users {...props} />
     case 'forecast':
