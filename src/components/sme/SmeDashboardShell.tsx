@@ -18,6 +18,7 @@ import {
   Sparkles,
   TrendingUp,
   Users,
+  Workflow,
 } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import type { ReactNode } from 'react'
@@ -36,7 +37,7 @@ import { cn } from '@/lib/utils'
 type NavLink = {
   href: string
   label: string
-  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'reports' | 'import' | 'coaching' | 'integrations' | 'settings' | 'billing'
+  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'team' | 'forecast' | 'reports' | 'import' | 'automation' | 'coaching' | 'integrations' | 'settings' | 'billing'
 }
 
 const navigation: NavLink[] = [
@@ -50,6 +51,7 @@ const navigation: NavLink[] = [
   { href: '/forecast', label: 'Forecast', icon: 'forecast' },
   { href: '/reports', label: 'Reports', icon: 'reports' },
   { href: '/import', label: 'Import', icon: 'import' },
+  { href: '/automations', label: 'Automations', icon: 'automation' },
   { href: '/coach', label: 'AI coach', icon: 'coaching' },
   { href: '/channels', label: 'Channels', icon: 'integrations' },
 ]
@@ -82,6 +84,8 @@ function NavIcon({ icon }: { icon: NavLink['icon'] }) {
       return <TrendingUp {...props} />
     case 'import':
       return <FileSpreadsheet {...props} />
+    case 'automation':
+      return <Workflow {...props} />
     case 'coaching':
       return <Bot {...props} />
     case 'integrations':
