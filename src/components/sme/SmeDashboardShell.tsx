@@ -39,11 +39,11 @@ type NavLink = {
 
 const navigation: NavLink[] = [
   { href: '/home', label: 'Dashboard', icon: 'home' },
-  { href: '/home#inbox', label: 'Inbox', icon: 'conversations' },
-  { href: '/home#leads', label: 'Deals', icon: 'pipeline' },
-  { href: '/home#forecast', label: 'Forecast', icon: 'forecast' },
-  { href: '/home#copilot', label: 'AI coach', icon: 'coaching' },
-  { href: '/home#channels', label: 'Channels', icon: 'integrations' },
+  { href: '/inbox', label: 'Inbox', icon: 'conversations' },
+  { href: '/deals', label: 'Deals', icon: 'pipeline' },
+  { href: '/forecast', label: 'Forecast', icon: 'forecast' },
+  { href: '/coach', label: 'AI coach', icon: 'coaching' },
+  { href: '/channels', label: 'Channels', icon: 'integrations' },
 ]
 
 const secondaryNavigation: NavLink[] = [
@@ -75,7 +75,7 @@ function NavIcon({ icon }: { icon: NavLink['icon'] }) {
 
 function RailNavItem({ item }: { item: NavLink }) {
   const pathname = usePathname()
-  const active = item.href === '/home' ? pathname === '/home' : pathname?.startsWith(item.href)
+  const active = pathname === item.href || (item.href !== '/home' && pathname?.startsWith(item.href))
 
   return (
     <Tooltip>
@@ -100,6 +100,9 @@ function RailNavItem({ item }: { item: NavLink }) {
 }
 
 export default function SmeDashboardShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const currentLabel = navigation.find(item => item.href === pathname)?.label ?? secondaryNavigation.find(item => item.href === pathname)?.label ?? 'Workspace'
+
   return (
     <div className="min-h-screen overflow-hidden bg-[#080a0d] text-zinc-100">
       <div className="flex h-screen min-h-screen w-full overflow-hidden bg-[#050607]">
@@ -136,8 +139,8 @@ export default function SmeDashboardShell({ children }: { children: ReactNode })
               className={cn('hidden h-10 px-4 text-xs font-medium md:inline-flex', pillButtonClass)}
               asChild
             >
-              <Link href="/home">
-                Dashboard
+              <Link href={pathname || '/home'}>
+                {currentLabel}
                 <TrendingUp className="size-3.5" />
               </Link>
             </Button>
