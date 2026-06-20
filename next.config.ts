@@ -26,8 +26,14 @@ function clerkOrigin(value?: string) {
 const clerkCustomOrigin = clerkOrigin(process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || process.env.NEXT_PUBLIC_CLERK_DOMAIN)
 const clerkHosts = [
   clerkCustomOrigin,
+  'https://clerk.halvex.ai',
   'https://clerk.accounts.dev',
   'https://*.clerk.accounts.dev',
+].filter(Boolean).join(' ')
+const clerkSocketHosts = [
+  clerkCustomOrigin.replace(/^https:/, 'wss:'),
+  'wss://clerk.halvex.ai',
+  'wss://ws.clerk.accounts.dev',
 ].filter(Boolean).join(' ')
 
 const csp = [
@@ -41,7 +47,7 @@ const csp = [
   // Fonts: self + data URIs + Google Fonts CDN
   "font-src 'self' data: https://fonts.gstatic.com",
   // Connections: self + Supabase + Clerk (custom domain + accounts) + Stripe + Vercel analytics
-  `connect-src 'self' ${supabaseHosts} https://*.supabase.co wss://*.supabase.co ${clerkHosts} wss://ws.clerk.accounts.dev https://clerk-telemetry.com https://api.stripe.com https://vitals.vercel-insights.com https://*.vercel-insights.com`,
+  `connect-src 'self' ${supabaseHosts} https://*.supabase.co wss://*.supabase.co ${clerkHosts} ${clerkSocketHosts} https://clerk-telemetry.com https://api.stripe.com https://vitals.vercel-insights.com https://*.vercel-insights.com`,
   // Frames: Clerk hosted pages only
   `frame-src https://accounts.clerk.dev ${clerkHosts} https://js.stripe.com`,
   // Workers: self
