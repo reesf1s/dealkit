@@ -2,8 +2,8 @@ export const dynamic = 'force-dynamic'
 
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { addDemoCrmLead, createCrmLead, type LeadMutationInput } from '@/lib/sme-crm'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { updateCrmLead, updateDemoCrmLead, type LeadMutationInput } from '@/lib/sme-crm'
 
 function leadInput(body: Record<string, unknown>): LeadMutationInput {
   return {
@@ -21,13 +21,16 @@ function leadInput(body: Record<string, unknown>): LeadMutationInput {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>
     const data = leadInput(body)
+    const { id } = await context.params
 
     if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
-      return NextResponse.json({ lead: addDemoCrmLead(data) })
+      const lead = updateDemoCrmLead({ leadId: id, data })
+      if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+      return NextResponse.json({ lead })
     }
 
     const { userId } = await auth()
@@ -36,11 +39,12 @@ export async function POST(req: NextRequest) {
     const user = await currentUser()
     const email = user?.emailAddresses[0]?.emailAddress
     const { workspaceId } = await getWorkspaceContext(userId, email)
-    const lead = await createCrmLead({ workspaceId, ownerId: userId, data })
+    const lead = await updateCrmLead({ workspaceId, leadId: id, data })
 
+    if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     return NextResponse.json({ lead })
   } catch (error) {
-    console.error('[POST /api/crm/leads]', error)
-    return NextResponse.json({ error: 'Unable to create lead' }, { status: 500 })
+    console.error('[PATCH /api/crm/leads/[id]]', error)
+    return NextResponse.json({ error: 'Unable to update lead' }, { status: 500 })
   }
 }

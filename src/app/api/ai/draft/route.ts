@@ -55,7 +55,7 @@ function requestLead(value: unknown): CrmLeadDto | null {
     expectedCloseDate: typeof lead.expectedCloseDate === 'string' ? lead.expectedCloseDate : undefined,
     latestActivityAt: typeof lead.latestActivityAt === 'string' ? lead.latestActivityAt : new Date().toISOString(),
     openTaskCount: typeof lead.openTaskCount === 'number' ? lead.openTaskCount : 0,
-    channel: lead.channel === 'instagram' || lead.channel === 'linkedin' || lead.channel === 'webchat' || lead.channel === 'mail' ? lead.channel : 'mail',
+    channel: lead.channel === 'meetings' || lead.channel === 'linkedin' || lead.channel === 'webchat' || lead.channel === 'mail' ? lead.channel : 'mail',
     risk: lead.risk === 'hot' || lead.risk === 'warm' || lead.risk === 'new' ? lead.risk : 'new',
     notes: typeof lead.notes === 'string' ? lead.notes : `# ${lead.title}`,
   }

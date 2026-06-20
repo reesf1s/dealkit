@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { setChannelConnection, updateDemoChannelConnection, type ChannelId } from '@/lib/sme-crm'
 
-const channels = new Set(['mail', 'instagram', 'linkedin', 'webchat'])
+const channels = new Set(['mail', 'linkedin', 'webchat', 'meetings'])
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ provider: string }> }) {
   try {

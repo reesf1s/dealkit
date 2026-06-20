@@ -25,7 +25,7 @@ import {
   type RecoveryTask,
 } from '@/lib/recovery-intelligence'
 
-export type ChannelId = 'mail' | 'instagram' | 'linkedin' | 'webchat'
+export type ChannelId = 'mail' | 'linkedin' | 'webchat' | 'meetings'
 
 export type CrmLeadDto = RecoveryRecord & {
   id: string
@@ -78,14 +78,33 @@ export type LeadMutationInput = {
   risk?: CrmLeadDto['risk']
 }
 
-const channelIds = ['mail', 'instagram', 'linkedin', 'webchat'] as const
+export type TaskMutationInput = {
+  leadId?: string
+  title?: string
+  description?: string
+  priority?: string
+  dueAt?: string
+  companyName?: string
+  personName?: string
+}
+
+const channelIds = ['mail', 'linkedin', 'webchat', 'meetings'] as const
+const legacyChannelAliases: Record<string, ChannelId> = {
+  instagram: 'meetings',
+}
 
 const seedChannels = [
   { provider: 'mail', name: 'Gmail', connected: true, status: 'connected' },
-  { provider: 'instagram', name: 'Instagram', connected: true, status: 'connected' },
   { provider: 'linkedin', name: 'LinkedIn', connected: false, status: 'oauth_pending' },
   { provider: 'webchat', name: 'Web Chat', connected: true, status: 'connected' },
+  { provider: 'meetings', name: 'Calls & Meetings', connected: true, status: 'connected' },
 ] satisfies Array<{ provider: ChannelId; name: string; connected: boolean; status: string }>
+
+function normalizeChannel(value: unknown): ChannelId {
+  const channel = String(value ?? 'mail')
+  if (channelIds.includes(channel as ChannelId)) return channel as ChannelId
+  return legacyChannelAliases[channel] ?? 'mail'
+}
 
 function date(daysFromNow: number) {
   const value = new Date()
@@ -127,7 +146,7 @@ function leadSeed(workspaceId: string, ownerId: string): NewCrmLeadRow[] {
       status: 'discovery',
       stage: 'Proposal',
       stageName: 'Proposal',
-      description: 'Instagram lead from story swipe-up. Wants pricing proof and references.',
+      description: 'LinkedIn Sales Navigator lead. Wants pricing proof, implementation references, and rollout confidence.',
       nextStep: 'Send social-proof pack and ask for kickoff availability.',
       companyName: 'Northway Retail',
       primaryPersonName: 'Jules Moreno',
@@ -136,9 +155,9 @@ function leadSeed(workspaceId: string, ownerId: string): NewCrmLeadRow[] {
       expectedCloseDate: date(7),
       latestActivityAt: date(-2),
       openTaskCount: 1,
-      channel: 'instagram',
+      channel: 'linkedin',
       risk: 'warm',
-      notes: '# Northway Retail\n- Came from Instagram\n- Needs SME references\n- Ask about kickoff window',
+      notes: '# Northway Retail\n- Came from LinkedIn Sales Navigator\n- Needs implementation references\n- Ask about kickoff window',
     },
     {
       workspaceId,
@@ -191,8 +210,8 @@ function seededMessages(workspaceId: string, leads: CrmLeadRow[]): NewCrmMessage
   return [
     { workspaceId, leadId: byTitle.get('Harborline Studio')!.id, channel: 'mail', fromRole: 'customer', body: 'Can we talk before Friday? We need numbers by end of week.', sentAt: date(-1) },
     { workspaceId, leadId: byTitle.get('Harborline Studio')!.id, channel: 'mail', fromRole: 'rep', body: 'Absolutely. I can share a 2-step rollout and pricing breakdown today.', sentAt: date(-1) },
-    { workspaceId, leadId: byTitle.get('Northway Retail')!.id, channel: 'instagram', fromRole: 'customer', body: 'I liked your one-pager. What kind of onboarding support is included?', sentAt: date(-2) },
-    { workspaceId, leadId: byTitle.get('Northway Retail')!.id, channel: 'instagram', fromRole: 'rep', body: 'I can cover implementation planning and first-week training in every plan.', sentAt: date(-2) },
+    { workspaceId, leadId: byTitle.get('Northway Retail')!.id, channel: 'linkedin', fromRole: 'customer', body: 'I liked your one-pager. What kind of onboarding support is included?', sentAt: date(-2) },
+    { workspaceId, leadId: byTitle.get('Northway Retail')!.id, channel: 'linkedin', fromRole: 'rep', body: 'I can cover implementation planning and first-week training in every plan.', sentAt: date(-2) },
     { workspaceId, leadId: byTitle.get('Orbit Logistics')!.id, channel: 'linkedin', fromRole: 'customer', body: 'Need budget-aligned option for 45 seats. Can we discuss Monday?', sentAt: date(-3) },
     { workspaceId, leadId: byTitle.get('Crescent Systems')!.id, channel: 'webchat', fromRole: 'customer', body: 'Hi there, are you available for a quick demo?', sentAt: date(-8) },
     { workspaceId, leadId: byTitle.get('Crescent Systems')!.id, channel: 'webchat', fromRole: 'rep', body: 'Yes, I can book a 20-min discovery window for tomorrow.', sentAt: date(-8) },
@@ -212,7 +231,7 @@ function seededActivities(workspaceId: string, leads: CrmLeadRow[]): NewCrmActiv
   const byTitle = new Map(leads.map(lead => [lead.title, lead]))
   return [
     { workspaceId, leadId: byTitle.get('Harborline Studio')!.id, title: 'Email opened', body: 'Recipient viewed outreach after three reminders.', type: 'engagement', occurredAt: date(-1), companyName: 'Harborline Studio', personName: 'Maya Chen' },
-    { workspaceId, leadId: byTitle.get('Northway Retail')!.id, title: 'Instagram reply', body: 'Customer asked for deployment timeline and support availability.', type: 'reply', occurredAt: date(-2), companyName: 'Northway Retail', personName: 'Jules Moreno' },
+    { workspaceId, leadId: byTitle.get('Northway Retail')!.id, title: 'LinkedIn reply', body: 'Customer asked for deployment timeline and support availability.', type: 'reply', occurredAt: date(-2), companyName: 'Northway Retail', personName: 'Jules Moreno' },
     { workspaceId, leadId: byTitle.get('Crescent Systems')!.id, title: 'Webchat bounce', body: 'No reply after first message, lead still warm based on visit frequency.', type: 'follow_up', occurredAt: date(-5), companyName: 'Crescent Systems', personName: 'Ari Patel' },
   ]
 }
@@ -251,7 +270,7 @@ export function leadToDto(lead: CrmLeadRow): CrmLeadDto {
     expectedCloseDate: toIso(lead.expectedCloseDate),
     latestActivityAt: toIso(lead.latestActivityAt),
     openTaskCount: lead.openTaskCount,
-    channel: lead.channel as ChannelId,
+    channel: normalizeChannel(lead.channel),
     risk: lead.risk as CrmLeadDto['risk'],
     notes: lead.notes,
   }
@@ -261,7 +280,7 @@ function messageToDto(message: CrmMessageRow): CrmMessageDto {
   return {
     id: message.id,
     leadId: message.leadId,
-    channel: message.channel as ChannelId,
+    channel: normalizeChannel(message.channel),
     from: message.fromRole as CrmMessageDto['from'],
     text: message.body,
     time: message.sentAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
@@ -296,7 +315,7 @@ function activityToRecovery(activity: CrmActivityRow): RecoveryActivity {
 
 function channelToDto(channel: CrmChannelRow): CrmChannelDto {
   return {
-    id: channel.provider as ChannelId,
+    id: normalizeChannel(channel.provider),
     name: channel.name,
     connected: channel.connected,
     status: channel.status,
@@ -317,12 +336,13 @@ export async function getCrmWorkspacePayload(workspaceId: string): Promise<CrmWo
   const activityDtos = activities.map(activityToRecovery)
   const groupedMessages: Record<ChannelId, CrmMessageDto[]> = {
     mail: [],
-    instagram: [],
     linkedin: [],
     webchat: [],
+    meetings: [],
   }
   for (const message of messages) {
-    if (channelIds.includes(message.channel as ChannelId)) groupedMessages[message.channel as ChannelId].push(messageToDto(message))
+    const channel = normalizeChannel(message.channel)
+    groupedMessages[channel].push(messageToDto(message))
   }
 
   return {
@@ -367,6 +387,19 @@ function cleanLeadInput(input: LeadMutationInput) {
     probability,
     channel: input.channel,
     risk: input.risk,
+  }
+}
+
+function cleanTaskInput(input: TaskMutationInput) {
+  const dueAt = input.dueAt ? new Date(input.dueAt) : undefined
+  return {
+    leadId: input.leadId?.trim(),
+    title: input.title?.trim(),
+    description: input.description?.trim(),
+    priority: input.priority === 'high' || input.priority === 'medium' || input.priority === 'low' ? input.priority : 'medium',
+    dueAt: dueAt && !Number.isNaN(dueAt.getTime()) ? dueAt : undefined,
+    companyName: input.companyName?.trim(),
+    personName: input.personName?.trim(),
   }
 }
 
@@ -422,6 +455,21 @@ export function createDemoCrmMessage(input: {
     text: input.text,
     time: sentAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
     sentAt: sentAt.toISOString(),
+  }
+}
+
+function createDemoCrmTask(input: TaskMutationInput): RecoveryTask {
+  const cleaned = cleanTaskInput(input)
+  const dueAt = cleaned.dueAt ?? date(3)
+
+  return {
+    id: demoId('demo-task'),
+    title: cleaned.title || 'Follow up with buyer',
+    description: cleaned.description || 'Complete the next sales action and update the deal record.',
+    priority: cleaned.priority,
+    dueAt: dueAt.toISOString(),
+    companyName: cleaned.companyName || 'New account',
+    personName: cleaned.personName || 'Buyer',
   }
 }
 
@@ -517,6 +565,40 @@ export async function updateCrmLead(input: { workspaceId: string; leadId: string
   return lead ? leadToDto(lead) : null
 }
 
+export async function createCrmTask(input: { workspaceId: string; data: TaskMutationInput }) {
+  const data = cleanTaskInput(input.data)
+  let lead: CrmLeadRow | undefined
+
+  if (data.leadId) {
+    const [candidate] = await db
+      .select()
+      .from(crmLeads)
+      .where(and(eq(crmLeads.id, data.leadId), eq(crmLeads.workspaceId, input.workspaceId)))
+      .limit(1)
+    lead = candidate
+  }
+
+  const [task] = await db.insert(crmTasks).values({
+    workspaceId: input.workspaceId,
+    leadId: lead?.id,
+    title: data.title || 'Follow up with buyer',
+    description: data.description || 'Complete the next sales action and update the deal record.',
+    priority: data.priority,
+    dueAt: data.dueAt ?? date(3),
+    companyName: data.companyName || lead?.companyName || null,
+    personName: data.personName || lead?.primaryPersonName || null,
+  }).returning()
+
+  if (lead) {
+    await db
+      .update(crmLeads)
+      .set({ openTaskCount: lead.openTaskCount + 1, updatedAt: new Date() })
+      .where(and(eq(crmLeads.id, lead.id), eq(crmLeads.workspaceId, input.workspaceId)))
+  }
+
+  return taskToRecovery(task)
+}
+
 export async function createCrmMessage(input: { workspaceId: string; leadId: string; channel: ChannelId; from: CrmMessageDto['from']; text: string }) {
   const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, input.leadId)).limit(1)
   if (!lead || lead.workspaceId !== input.workspaceId) return null
@@ -546,13 +628,24 @@ export async function getLeadForWorkspace(workspaceId: string, leadId: string) {
 
 export async function setChannelConnection(input: { workspaceId: string; provider: ChannelId; connected: boolean }) {
   const [channel] = await db
-    .update(crmChannels)
-    .set({
+    .insert(crmChannels)
+    .values({
+      workspaceId: input.workspaceId,
+      provider: input.provider,
+      name: seedChannels.find(channel => channel.provider === input.provider)?.name ?? input.provider,
       connected: input.connected,
       status: input.connected ? 'connected' : 'oauth_pending',
+      createdAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(and(eq(crmChannels.provider, input.provider), eq(crmChannels.workspaceId, input.workspaceId)))
+    .onConflictDoUpdate({
+      target: [crmChannels.workspaceId, crmChannels.provider],
+      set: {
+        connected: input.connected,
+        status: input.connected ? 'connected' : 'oauth_pending',
+        updatedAt: new Date(),
+      },
+    })
     .returning()
 
   if (!channel) return null
@@ -636,6 +729,56 @@ export function addDemoCrmMessage(input: { leadId: string; channel: ChannelId; f
   return message
 }
 
+export function updateDemoCrmLead(input: { leadId: string; data: LeadMutationInput }) {
+  const workspace = getDemoCrmWorkspaceState()
+  const existing = workspace.leads.find(candidate => candidate.id === input.leadId)
+  if (!existing) return null
+
+  const cleaned = cleanLeadInput(input.data)
+  const risk = cleaned.risk ?? existing.risk
+  const probability = cleaned.probability ?? Number(existing.probability ?? 0)
+  const updated: CrmLeadDto = {
+    ...existing,
+    title: cleaned.title || existing.title,
+    owner: cleaned.ownerName || existing.owner,
+    companyName: cleaned.companyName || existing.companyName,
+    primaryPersonName: cleaned.primaryPersonName || existing.primaryPersonName,
+    stage: cleaned.stage || existing.stage,
+    stageName: cleaned.stageName || existing.stageName,
+    description: cleaned.description ?? existing.description,
+    nextStep: cleaned.nextStep ?? existing.nextStep,
+    valueAmount: cleaned.valueAmount ?? existing.valueAmount,
+    probability,
+    channel: cleaned.channel ?? existing.channel,
+    risk,
+    score: scoreFromProbability(probability, risk),
+    latestActivityAt: new Date().toISOString(),
+  }
+
+  workspace.leads = workspace.leads.map(candidate => candidate.id === input.leadId ? updated : candidate)
+  refreshDemoWorkspace(workspace)
+  return updated
+}
+
+export function addDemoCrmTask(input: TaskMutationInput) {
+  const workspace = getDemoCrmWorkspaceState()
+  const lead = input.leadId ? workspace.leads.find(candidate => candidate.id === input.leadId) : undefined
+  const task = createDemoCrmTask({
+    ...input,
+    companyName: input.companyName || lead?.companyName || undefined,
+    personName: input.personName || lead?.primaryPersonName || undefined,
+  })
+
+  workspace.tasks = [task, ...workspace.tasks]
+  if (lead) {
+    workspace.leads = workspace.leads.map(candidate => (
+      candidate.id === lead.id ? { ...candidate, openTaskCount: Number(candidate.openTaskCount ?? 0) + 1 } : candidate
+    ))
+  }
+  refreshDemoWorkspace(workspace)
+  return task
+}
+
 export function saveDemoCrmLeadNotes(input: { leadId: string; notes: string }) {
   const workspace = getDemoCrmWorkspaceState()
   const lead = workspace.leads.find(candidate => candidate.id === input.leadId)
@@ -700,7 +843,7 @@ export function getDemoCrmWorkspacePayload(): CrmWorkspacePayload {
       expectedCloseDate: date(8).toISOString(),
       latestActivityAt: date(-1).toISOString(),
       openTaskCount: 3,
-      channel: 'instagram',
+      channel: 'meetings',
       risk: 'hot',
       notes: '# Solstice Dental Group\n- Comparing Halvex against Gong\n- Budget available this month\n- Legal wants security notes\n\n## Next\nBook the owner decision call and send the Gong comparison.',
     },
@@ -733,7 +876,7 @@ export function getDemoCrmWorkspacePayload(): CrmWorkspacePayload {
       status: 'discovery',
       stage: 'Proposal',
       stageName: 'Proposal',
-      description: 'Instagram lead from story swipe-up. Wants pricing proof and references.',
+      description: 'LinkedIn Sales Navigator lead. Wants pricing proof, implementation references, and rollout confidence.',
       nextStep: 'Send social-proof pack and ask for kickoff availability.',
       companyName: 'Northway Retail',
       primaryPersonName: 'Jules Moreno',
@@ -742,9 +885,9 @@ export function getDemoCrmWorkspacePayload(): CrmWorkspacePayload {
       expectedCloseDate: date(7).toISOString(),
       latestActivityAt: date(-2).toISOString(),
       openTaskCount: 1,
-      channel: 'instagram',
+      channel: 'linkedin',
       risk: 'warm',
-      notes: '# Northway Retail\n- Came from Instagram\n- Needs SME references\n- Ask about kickoff window',
+      notes: '# Northway Retail\n- Came from LinkedIn Sales Navigator\n- Needs implementation references\n- Ask about kickoff window',
     },
     {
       id: 'demo-crescent',
@@ -794,14 +937,14 @@ export function getDemoCrmWorkspacePayload(): CrmWorkspacePayload {
       demoMessage({ id: 'demo-msg-1', leadId: 'demo-harborline', channel: 'mail', from: 'customer', text: 'Can we talk before Friday? We need numbers by end of week.', daysAgo: 1 }),
       demoMessage({ id: 'demo-msg-2', leadId: 'demo-harborline', channel: 'mail', from: 'rep', text: 'Absolutely. I can share a 2-step rollout and pricing breakdown today.', daysAgo: 1 }),
     ],
-    instagram: [
-      demoMessage({ id: 'demo-msg-solstice-1', leadId: 'demo-solstice', channel: 'instagram', from: 'customer', text: 'Gong feels too heavy for a small team. Can Halvex cover call notes, DMs, and follow-ups without another admin layer?', daysAgo: 1 }),
-      demoMessage({ id: 'demo-msg-solstice-2', leadId: 'demo-solstice', channel: 'instagram', from: 'rep', text: 'Yes. Halvex keeps the inbox, transcript capture, next action, and forecast signal in one workspace so reps do not switch tools.', daysAgo: 1 }),
-      demoMessage({ id: 'demo-msg-solstice-3', leadId: 'demo-solstice', channel: 'instagram', from: 'customer', text: 'Good. We have budget this month, but legal needs security notes and the owner wants a Friday decision call.', daysAgo: 1 }),
-      demoMessage({ id: 'demo-msg-3', leadId: 'demo-northway', channel: 'instagram', from: 'customer', text: 'I liked your one-pager. What kind of onboarding support is included?', daysAgo: 2 }),
-      demoMessage({ id: 'demo-msg-4', leadId: 'demo-northway', channel: 'instagram', from: 'rep', text: 'I can cover implementation planning and first-week training in every plan.', daysAgo: 2 }),
+    meetings: [
+      demoMessage({ id: 'demo-msg-solstice-1', leadId: 'demo-solstice', channel: 'meetings', from: 'customer', text: 'Gong feels too heavy for a small team. Can Halvex cover call notes, transcripts, and follow-ups without another admin layer?', daysAgo: 1 }),
+      demoMessage({ id: 'demo-msg-solstice-2', leadId: 'demo-solstice', channel: 'meetings', from: 'rep', text: 'Yes. Halvex keeps transcript capture, next action, and forecast signal in one workspace so reps do not switch tools.', daysAgo: 1 }),
+      demoMessage({ id: 'demo-msg-solstice-3', leadId: 'demo-solstice', channel: 'meetings', from: 'customer', text: 'Good. We have budget this month, but legal needs security notes and the owner wants a Friday decision call.', daysAgo: 1 }),
     ],
     linkedin: [
+      demoMessage({ id: 'demo-msg-3', leadId: 'demo-northway', channel: 'linkedin', from: 'customer', text: 'I liked your one-pager. What kind of onboarding support is included?', daysAgo: 2 }),
+      demoMessage({ id: 'demo-msg-4', leadId: 'demo-northway', channel: 'linkedin', from: 'rep', text: 'I can cover implementation planning and first-week training in every plan.', daysAgo: 2 }),
       demoMessage({ id: 'demo-msg-5', leadId: 'demo-orbit', channel: 'linkedin', from: 'customer', text: 'Need budget-aligned option for 45 seats. Can we discuss Monday?', daysAgo: 3 }),
     ],
     webchat: [
@@ -822,7 +965,7 @@ export function getDemoCrmWorkspacePayload(): CrmWorkspacePayload {
     { id: 'demo-activity-solstice-1', title: 'Competitor mentioned', body: 'Buyer compared Halvex with Gong and objected to workflow weight for a small sales team.', type: 'call_signal', occurredAt: date(-1).toISOString(), companyName: 'Solstice Dental Group', personName: 'Nina Frost', dealTitle: 'Solstice Dental Group' },
     { id: 'demo-activity-solstice-2', title: 'Decision window captured', body: 'Owner wants a Friday decision call after legal reviews security notes.', type: 'intent', occurredAt: date(-1).toISOString(), companyName: 'Solstice Dental Group', personName: 'Nina Frost', dealTitle: 'Solstice Dental Group' },
     { id: 'demo-activity-1', title: 'Email opened', body: 'Recipient viewed outreach after three reminders.', type: 'engagement', occurredAt: date(-1).toISOString(), companyName: 'Harborline Studio', personName: 'Maya Chen', dealTitle: 'Harborline Studio' },
-    { id: 'demo-activity-2', title: 'Instagram reply', body: 'Customer asked for deployment timeline and support availability.', type: 'reply', occurredAt: date(-2).toISOString(), companyName: 'Northway Retail', personName: 'Jules Moreno', dealTitle: 'Northway Retail' },
+    { id: 'demo-activity-2', title: 'LinkedIn reply', body: 'Customer asked for deployment timeline and support availability.', type: 'reply', occurredAt: date(-2).toISOString(), companyName: 'Northway Retail', personName: 'Jules Moreno', dealTitle: 'Northway Retail' },
     { id: 'demo-activity-3', title: 'Webchat bounce', body: 'No reply after first message, lead still warm based on visit frequency.', type: 'follow_up', occurredAt: date(-5).toISOString(), companyName: 'Crescent Systems', personName: 'Ari Patel', dealTitle: 'Crescent Systems' },
   ]
 

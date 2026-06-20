@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 const settings = [
   {
     title: 'Channel status',
-    description: 'Mail, Instagram, and web leads are available in this build.',
+    description: 'Mail, LinkedIn, meetings, and web leads are available in this build.',
     detail: 'LinkedIn, WhatsApp, and more OAuth providers can plug into the same channel layer next.',
     icon: PlugZap,
   },
