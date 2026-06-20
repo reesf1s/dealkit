@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3,
-  Bell,
   Bot,
   CalendarDays,
   CheckSquare,
@@ -16,7 +15,6 @@ import {
   PhoneCall,
   PlugZap,
   Settings,
-  Sparkles,
   TrendingUp,
   Users,
   Workflow,
@@ -24,7 +22,6 @@ import {
 import { UserButton } from '@clerk/nextjs'
 import type { ReactNode } from 'react'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -33,6 +30,7 @@ import {
 } from '@/components/ui/tooltip'
 import { pillButtonClass } from '@/components/sme/halvex-system'
 import WorkspaceCommandBar from '@/components/sme/WorkspaceCommandBar'
+import WorkspaceSignals from '@/components/sme/WorkspaceSignals'
 import { cn } from '@/lib/utils'
 
 type NavLink = {
@@ -175,19 +173,7 @@ export default function SmeDashboardShell({ children }: { children: ReactNode })
 
             <WorkspaceCommandBar />
 
-            <Badge variant="secondary" className="hidden h-9 rounded-full border-white/8 bg-white/8 px-3 text-[11px] text-zinc-200 lg:inline-flex">
-              <Sparkles className="size-3" />
-              2 new
-            </Badge>
-
-            <Badge variant="outline" className="hidden h-9 gap-1 rounded-full border-white/8 bg-black/30 px-3 text-[11px] text-zinc-300 lg:inline-flex">
-              <CalendarDays className="size-3" />
-              Today, Jun 20
-            </Badge>
-
-            <Button variant="ghost" size="icon" className="size-9 rounded-full text-zinc-400 hover:bg-white/8 hover:text-white" aria-label="Notifications">
-              <Bell className="size-4" />
-            </Button>
+            <WorkspaceSignals />
 
             <div className="grid size-9 place-items-center rounded-full border border-white/10 bg-white/8">
               <UserButton />
