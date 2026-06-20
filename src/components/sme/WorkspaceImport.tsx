@@ -187,6 +187,7 @@ export default function WorkspaceImport() {
                   <TableHead className="text-zinc-500">Owner</TableHead>
                   <TableHead className="text-zinc-500">Stage</TableHead>
                   <TableHead className="text-zinc-500">Value</TableHead>
+                  <TableHead className="text-zinc-500">Close</TableHead>
                   <TableHead className="text-zinc-500">Risk</TableHead>
                 </TableRow>
               </TableHeader>
@@ -202,12 +203,13 @@ export default function WorkspaceImport() {
                     <TableCell className="text-zinc-400">{row.owner}</TableCell>
                     <TableCell className="text-zinc-300">{row.stage}</TableCell>
                     <TableCell className="text-zinc-300">{money(row.valueAmount)}</TableCell>
+                    <TableCell className="text-zinc-400">{row.expectedCloseDate || 'Default'}</TableCell>
                     <TableCell><Badge variant="outline" className={row.risk === 'hot' ? 'border-red-300/20 bg-red-300/10 text-red-100' : row.risk === 'warm' ? 'border-yellow-300/20 bg-yellow-300/10 text-yellow-100' : 'border-blue-300/20 bg-blue-300/10 text-blue-100'}>{row.risk}</Badge></TableCell>
                   </TableRow>
                 ))}
                 {!previewRows.length ? (
                   <TableRow className="border-white/8">
-                    <TableCell colSpan={5} className="py-10 text-center text-sm text-zinc-500">Preview a CSV to inspect rows before importing.</TableCell>
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-zinc-500">Preview a CSV to inspect rows before importing.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>

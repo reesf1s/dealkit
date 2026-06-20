@@ -30,10 +30,17 @@ type LeadForm = {
   stage: string
   valueAmount: string
   probability: string
+  expectedCloseDate: string
   channel: ChannelId
   risk: CrmLeadDto['risk']
   description: string
   nextStep: string
+}
+
+function defaultCloseDateInput() {
+  const closeDate = new Date()
+  closeDate.setDate(closeDate.getDate() + 14)
+  return closeDate.toISOString().slice(0, 10)
 }
 
 const emptyLeadForm: LeadForm = {
@@ -43,6 +50,7 @@ const emptyLeadForm: LeadForm = {
   stage: 'Discovery',
   valueAmount: '',
   probability: '35',
+  expectedCloseDate: defaultCloseDateInput(),
   channel: 'mail',
   risk: 'new',
   description: '',
@@ -79,6 +87,7 @@ async function createLead(form: LeadForm) {
       stage: form.stage,
       valueAmount: Number(form.valueAmount || 0),
       probability: Number(form.probability || 0),
+      expectedCloseDate: form.expectedCloseDate,
       channel: form.channel,
       risk: form.risk,
       description: form.description,
@@ -275,6 +284,7 @@ export default function WorkspaceCommandBar() {
               <Label className="grid gap-2 text-xs text-zinc-500">Stage<Input value={form.stage} onChange={event => setForm({ ...form, stage: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
               <Label className="grid gap-2 text-xs text-zinc-500">Value<Input type="number" value={form.valueAmount} onChange={event => setForm({ ...form, valueAmount: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
               <Label className="grid gap-2 text-xs text-zinc-500">Probability<Input type="number" value={form.probability} onChange={event => setForm({ ...form, probability: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+              <Label className="grid gap-2 text-xs text-zinc-500">Close date<Input type="date" value={form.expectedCloseDate} onChange={event => setForm({ ...form, expectedCloseDate: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
               <Label className="grid gap-2 text-xs text-zinc-500">Channel<select value={form.channel} onChange={event => setForm({ ...form, channel: event.target.value as ChannelId })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="mail">Email</option><option value="linkedin">LinkedIn</option><option value="webchat">Web chat</option><option value="meetings">Calls & meetings</option></select></Label>
               <Label className="grid gap-2 text-xs text-zinc-500">Risk<select value={form.risk} onChange={event => setForm({ ...form, risk: event.target.value as CrmLeadDto['risk'] })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="new">New</option><option value="warm">Warm</option><option value="hot">Hot</option></select></Label>
             </div>

@@ -56,6 +56,7 @@ type LeadFormState = {
   stage: string
   valueAmount: string
   probability: string
+  expectedCloseDate: string
   risk: CrmLeadDto['risk']
   channel: ChannelId
   nextStep: string
@@ -154,6 +155,13 @@ function shortDate(value?: string | Date | null) {
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(value))
 }
 
+function dateInputValue(value?: string | Date | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
 function daysAgo(value?: string | Date | null) {
   if (!value) return 'No activity'
   const days = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 86_400_000))
@@ -214,6 +222,7 @@ function leadFormState(lead: CrmLeadDto): LeadFormState {
     stage: lead.stageName || lead.stage || 'New',
     valueAmount: String(lead.valueAmount ?? 0),
     probability: String(lead.probability ?? 0),
+    expectedCloseDate: dateInputValue(lead.expectedCloseDate),
     risk: lead.risk,
     channel: lead.channel,
     nextStep: lead.nextStep ?? '',
@@ -2069,6 +2078,7 @@ function DealDetailSheet({
           status: activeForm.status,
           valueAmount: Number(activeForm.valueAmount),
           probability: Number(activeForm.probability),
+          expectedCloseDate: activeForm.expectedCloseDate,
         }),
       })
       await onRefresh()
@@ -2235,6 +2245,9 @@ function DealDetailSheet({
                   </DetailField>
                   <DetailField label="Probability">
                     <Input value={form.probability} type="number" min={0} max={100} onChange={event => setForm({ ...form, probability: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" />
+                  </DetailField>
+                  <DetailField label="Close date">
+                    <Input value={form.expectedCloseDate} type="date" onChange={event => setForm({ ...form, expectedCloseDate: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" />
                   </DetailField>
                   <DetailField label="Risk">
                     <select value={form.risk} onChange={event => setForm({ ...form, risk: event.target.value as CrmLeadDto['risk'] })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none">

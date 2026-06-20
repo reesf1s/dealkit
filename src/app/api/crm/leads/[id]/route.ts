@@ -18,6 +18,7 @@ function leadInput(body: Record<string, unknown>): LeadMutationInput {
     nextStep: typeof body.nextStep === 'string' ? body.nextStep : undefined,
     valueAmount: typeof body.valueAmount === 'number' ? body.valueAmount : Number(body.valueAmount ?? NaN),
     probability: typeof body.probability === 'number' ? body.probability : Number(body.probability ?? NaN),
+    expectedCloseDate: typeof body.expectedCloseDate === 'string' ? body.expectedCloseDate : undefined,
     channel: body.channel === 'meetings' || body.channel === 'linkedin' || body.channel === 'webchat' || body.channel === 'mail' ? body.channel : undefined,
     risk: body.risk === 'hot' || body.risk === 'warm' || body.risk === 'new' ? body.risk : undefined,
   }

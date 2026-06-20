@@ -10,6 +10,7 @@ const importRowSchema = z.object({
   status: z.string().trim().optional(),
   value: z.coerce.number().nonnegative().optional(),
   probability: z.coerce.number().min(0).max(100).optional(),
+  close_date: z.string().trim().optional(),
   risk: z.enum(['hot', 'warm', 'new']).optional(),
   channel: z.enum(['mail', 'linkedin', 'webchat', 'meetings']).optional(),
   next_step: z.string().trim().optional(),
@@ -24,6 +25,7 @@ export type CrmImportPreviewRow = {
   stage: string
   valueAmount: number
   probability: number
+  expectedCloseDate: string
   channel: ChannelId
   risk: CrmLeadDto['risk']
   nextStep: string
@@ -46,6 +48,9 @@ const headerAliases: Record<string, keyof z.infer<typeof importRowSchema>> = {
   amount: 'value',
   deal_value: 'value',
   prob: 'probability',
+  expected_close_date: 'close_date',
+  close: 'close_date',
+  closedate: 'close_date',
   next: 'next_step',
   nextstep: 'next_step',
 }
@@ -92,6 +97,13 @@ function cleanRow(input: Record<string, string>) {
   )
 }
 
+function closeDateInput(value?: string) {
+  if (!value) return undefined
+  const closeDate = new Date(value)
+  if (Number.isNaN(closeDate.getTime())) return null
+  return closeDate.toISOString().slice(0, 10)
+}
+
 export function parseCrmImportCsv(csv: string): CrmImportParseResult {
   const lines = csv.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim())
   if (!lines.length) return { rows: [], errors: [{ rowNumber: 1, message: 'CSV is empty' }] }
@@ -119,6 +131,12 @@ export function parseCrmImportCsv(csv: string): CrmImportParseResult {
     }
 
     const row = result.data
+    const expectedCloseDate = closeDateInput(row.close_date)
+    if (expectedCloseDate === null) {
+      errors.push({ rowNumber, message: 'close_date must be a valid date' })
+      continue
+    }
+
     rows.push({
       rowNumber,
       companyName: row.company,
@@ -127,6 +145,7 @@ export function parseCrmImportCsv(csv: string): CrmImportParseResult {
       stage: row.stage || 'Discovery',
       valueAmount: Math.round(row.value ?? 0),
       probability: Math.round(row.probability ?? 35),
+      expectedCloseDate: expectedCloseDate ?? '',
       channel: row.channel || 'mail',
       risk: row.risk || 'new',
       nextStep: row.next_step || 'Qualify the opportunity and confirm the next action.',
@@ -146,6 +165,7 @@ export function importRowToLeadInput(row: CrmImportPreviewRow): LeadMutationInpu
     stage: row.stage,
     valueAmount: row.valueAmount,
     probability: row.probability,
+    expectedCloseDate: row.expectedCloseDate,
     channel: row.channel,
     risk: row.risk,
     nextStep: row.nextStep,
@@ -154,7 +174,7 @@ export function importRowToLeadInput(row: CrmImportPreviewRow): LeadMutationInpu
 }
 
 export const CRM_IMPORT_TEMPLATE = [
-  'company,primary_contact,owner,stage,value,probability,risk,channel,next_step,description',
-  'Acme Manufacturing,Sam Ellis,Maya Chen,Discovery,24000,45,warm,mail,Book technical validation call,Imported from spreadsheet',
-  'Vertex Analytics,Jules Hart,Nina Frost,Proposal,68000,65,warm,linkedin,Send security pack and timeline,Interested in AI follow-up workflows',
+  'company,primary_contact,owner,stage,value,probability,close_date,risk,channel,next_step,description',
+  'Acme Manufacturing,Sam Ellis,Maya Chen,Discovery,24000,45,2026-07-03,warm,mail,Book technical validation call,Imported from spreadsheet',
+  'Vertex Analytics,Jules Hart,Nina Frost,Proposal,68000,65,2026-07-15,warm,linkedin,Send security pack and timeline,Interested in AI follow-up workflows',
 ].join('\n')

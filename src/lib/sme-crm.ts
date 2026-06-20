@@ -75,6 +75,7 @@ export type LeadMutationInput = {
   nextStep?: string
   valueAmount?: number
   probability?: number
+  expectedCloseDate?: string
   channel?: ChannelId
   risk?: CrmLeadDto['risk']
 }
@@ -381,6 +382,7 @@ function scoreFromProbability(probability: number, risk: CrmLeadDto['risk']) {
 function cleanLeadInput(input: LeadMutationInput) {
   const probability = Number.isFinite(input.probability) ? Math.max(0, Math.min(100, Math.round(input.probability!))) : undefined
   const valueAmount = Number.isFinite(input.valueAmount) ? Math.max(0, Math.round(input.valueAmount!)) : undefined
+  const expectedCloseDate = input.expectedCloseDate ? new Date(input.expectedCloseDate) : undefined
   return {
     title: input.title?.trim(),
     ownerName: input.owner?.trim(),
@@ -393,6 +395,7 @@ function cleanLeadInput(input: LeadMutationInput) {
     nextStep: input.nextStep?.trim(),
     valueAmount,
     probability,
+    expectedCloseDate: expectedCloseDate && !Number.isNaN(expectedCloseDate.getTime()) ? expectedCloseDate : undefined,
     channel: input.channel,
     risk: input.risk,
   }
@@ -449,7 +452,7 @@ export function createDemoCrmLead(data: LeadMutationInput): CrmLeadDto {
     primaryPersonName: personName,
     valueAmount: cleaned.valueAmount ?? 0,
     probability,
-    expectedCloseDate: date(14).toISOString(),
+    expectedCloseDate: (cleaned.expectedCloseDate ?? date(14)).toISOString(),
     latestActivityAt: new Date().toISOString(),
     openTaskCount: 0,
     channel: cleaned.channel ?? 'mail',
@@ -553,6 +556,7 @@ export async function createCrmLead(input: { workspaceId: string; ownerId: strin
     primaryPersonName: personName,
     valueAmount: data.valueAmount ?? 0,
     probability,
+    expectedCloseDate: data.expectedCloseDate ?? date(14),
     latestActivityAt: new Date(),
     openTaskCount: 0,
     channel: data.channel ?? 'mail',
@@ -589,6 +593,7 @@ export async function updateCrmLead(input: { workspaceId: string; leadId: string
       nextStep: data.nextStep ?? existing.nextStep,
       valueAmount: data.valueAmount ?? existing.valueAmount,
       probability,
+      expectedCloseDate: data.expectedCloseDate ?? existing.expectedCloseDate,
       channel: data.channel ?? existing.channel,
       risk,
       score: scoreFromProbability(probability, risk),
@@ -850,6 +855,7 @@ export function updateDemoCrmLead(input: { leadId: string; data: LeadMutationInp
     nextStep: cleaned.nextStep ?? existing.nextStep,
     valueAmount: cleaned.valueAmount ?? existing.valueAmount,
     probability,
+    expectedCloseDate: cleaned.expectedCloseDate ? cleaned.expectedCloseDate.toISOString() : existing.expectedCloseDate,
     channel: cleaned.channel ?? existing.channel,
     risk,
     score: scoreFromProbability(probability, risk),
