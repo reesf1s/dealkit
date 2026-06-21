@@ -3186,6 +3186,27 @@ function CoachView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 
 function ChannelsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const [busyChannel, setBusyChannel] = useState<ChannelId | null>(null)
+  const [selectedChannelId, setSelectedChannelId] = useState<ChannelId>(workspace.channels[0]?.id ?? 'mail')
+
+  useEffect(() => {
+    if (!workspace.channels.some(channel => channel.id === selectedChannelId) && workspace.channels[0]) {
+      setSelectedChannelId(workspace.channels[0].id)
+    }
+  }, [selectedChannelId, workspace.channels])
+
+  const channelRows = workspace.channels.map(channel => {
+    const messages = workspace.messages[channel.id] ?? []
+    const leads = workspace.leads.filter(lead => lead.channel === channel.id)
+    const pipeline = leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+    const weighted = leads.reduce((sum, lead) => sum + Math.round((Number(lead.valueAmount ?? 0) * Number(lead.probability ?? 0)) / 100), 0)
+    const stale = leads.filter(lead => lead.status !== 'won' && lead.status !== 'lost' && (!lead.latestActivityAt || Date.now() - new Date(lead.latestActivityAt).getTime() > 7 * 86_400_000)).length
+    return { channel, messages, leads, pipeline, weighted, stale }
+  }).sort((a, b) => b.pipeline - a.pipeline)
+  const selectedRow = channelRows.find(row => row.channel.id === selectedChannelId) ?? channelRows[0]
+  const connectedCount = workspace.channels.filter(channel => channel.connected).length
+  const totalMessages = Object.values(workspace.messages).flat().length
+  const activeChannelDeals = selectedRow?.leads.filter(lead => lead.status !== 'won' && lead.status !== 'lost') ?? []
+  const recentMessages = selectedRow?.messages.slice(-6).reverse() ?? []
 
   async function toggleChannel(channel: ChannelId, connected: boolean) {
     setBusyChannel(channel)
@@ -3201,36 +3222,183 @@ function ChannelsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
   }
 
   return (
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {workspace.channels.map(channel => {
-        const Icon = CHANNEL_ICONS[channel.id]
-        const count = workspace.messages[channel.id]?.length ?? 0
-        return (
-          <Card key={channel.id} className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <span className="grid size-11 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-200">
-                  <Icon className="size-5" />
-                </span>
-                <Badge variant="outline" className={channel.connected ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-yellow-300/20 bg-yellow-300/10 text-yellow-100'}>
-                  {channel.connected ? 'Connected' : 'Pending'}
-                </Badge>
-              </div>
-              <h2 className="mt-5 text-lg font-semibold text-white">{channel.name}</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">{count} messages currently feeding deal context from {channelLabel(channel.id)}.</p>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-5 w-full rounded-full border-white/10 bg-white/[0.04] text-zinc-100"
-                disabled={busyChannel === channel.id}
-                onClick={() => void toggleChannel(channel.id, channel.connected)}
-              >
-                {busyChannel === channel.id ? 'Updating...' : channel.connected ? 'Pause connection' : 'Connect channel'}
-              </Button>
-            </CardContent>
-          </Card>
-        )
-      })}
+    <section className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Connected sources" value={`${connectedCount}/${workspace.channels.length}`} detail="Only live sources feed the CRM workspace." icon={PlugZap} />
+        <StatCard label="Captured messages" value={`${totalMessages}`} detail="Evidence available for inbox and deal context." icon={MessageCircle} />
+        <StatCard label="Source pipeline" value={money(channelRows.reduce((sum, row) => sum + row.pipeline, 0))} detail="Open and closed value grouped by original channel." icon={TrendingUp} />
+        <StatCard label="Channel risks" value={`${channelRows.reduce((sum, row) => sum + row.stale, 0)}`} detail="Active source deals with stale evidence." icon={ShieldAlert} />
+      </div>
+
+      <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <CardHeader>
+            <CardTitle>Source registry</CardTitle>
+            <CardDescription>Manage the revenue sources that are allowed to feed Halvex.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {channelRows.map(row => {
+              const Icon = CHANNEL_ICONS[row.channel.id]
+              const selected = selectedRow?.channel.id === row.channel.id
+              return (
+                <button
+                  key={row.channel.id}
+                  type="button"
+                  onClick={() => setSelectedChannelId(row.channel.id)}
+                  className={cn(
+                    pillInsetClass,
+                    'p-4 text-left transition',
+                    selected ? 'border-blue-300/30 bg-blue-400/10' : 'hover:bg-white/[0.05]',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="grid size-10 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-200">
+                      <Icon className="size-4" />
+                    </span>
+                    <Badge variant="outline" className={row.channel.connected ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-yellow-300/20 bg-yellow-300/10 text-yellow-100'}>
+                      {row.channel.connected ? 'Live' : 'Paused'}
+                    </Badge>
+                  </div>
+                  <p className="mt-4 font-semibold text-white">{row.channel.name}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{row.leads.length} deals · {row.messages.length} messages</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-[16px] border border-white/8 bg-black/20 p-2">
+                      <p className="text-zinc-500">Pipeline</p>
+                      <p className="mt-1 font-semibold text-white">{money(row.pipeline)}</p>
+                    </div>
+                    <div className="rounded-[16px] border border-white/8 bg-black/20 p-2">
+                      <p className="text-zinc-500">Stale</p>
+                      <p className="mt-1 font-semibold text-white">{row.stale}</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </CardContent>
+        </Card>
+
+        {selectedRow ? (
+          <div className="grid gap-4">
+            <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+              <CardHeader>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>{selectedRow.channel.name} operations</CardTitle>
+                    <CardDescription>Pipeline, evidence, and source control for this channel.</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                      <Link href="/inbox">
+                        <MessageCircle className="size-4" />
+                        Open inbox
+                      </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      className="rounded-full bg-white text-black hover:bg-zinc-200"
+                      disabled={busyChannel === selectedRow.channel.id}
+                      onClick={() => void toggleChannel(selectedRow.channel.id, selectedRow.channel.connected)}
+                    >
+                      <PlugZap className="size-4" />
+                      {busyChannel === selectedRow.channel.id ? 'Updating...' : selectedRow.channel.connected ? 'Pause source' : 'Connect source'}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-4">
+                <div className={cn(pillInsetClass, 'p-4')}>
+                  <p className="text-xs text-zinc-500">Status</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{selectedRow.channel.connected ? 'Live' : 'Paused'}</p>
+                  <p className="mt-3 text-xs leading-5 text-zinc-500">Controls whether this source can feed CRM context.</p>
+                </div>
+                <div className={cn(pillInsetClass, 'p-4')}>
+                  <p className="text-xs text-zinc-500">Pipeline</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{money(selectedRow.pipeline)}</p>
+                  <p className="mt-3 text-xs leading-5 text-zinc-500">{money(selectedRow.weighted)} weighted.</p>
+                </div>
+                <div className={cn(pillInsetClass, 'p-4')}>
+                  <p className="text-xs text-zinc-500">Messages</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{selectedRow.messages.length}</p>
+                  <p className="mt-3 text-xs leading-5 text-zinc-500">Conversation records tied to this source.</p>
+                </div>
+                <div className={cn(pillInsetClass, 'p-4')}>
+                  <p className="text-xs text-zinc-500">Open deals</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{activeChannelDeals.length}</p>
+                  <p className="mt-3 text-xs leading-5 text-zinc-500">{selectedRow.stale} need fresher evidence.</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+              <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+                <CardHeader>
+                  <CardTitle>Channel deals</CardTitle>
+                  <CardDescription>Deals sourced from {channelLabel(selectedRow.channel.id)}, sorted by value.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-white/10 hover:bg-transparent">
+                        <TableHead className="text-zinc-500">Account</TableHead>
+                        <TableHead className="text-zinc-500">Stage</TableHead>
+                        <TableHead className="text-zinc-500">Risk</TableHead>
+                        <TableHead className="text-zinc-500">Value</TableHead>
+                        <TableHead className="text-zinc-500">Activity</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...selectedRow.leads].sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0)).map(lead => (
+                        <TableRow key={lead.id} className="border-white/8 hover:bg-white/[0.04]">
+                          <TableCell>
+                            <button type="button" onClick={() => actions.selectLead(lead.id)} className="min-w-48 text-left">
+                              <p className="truncate font-medium text-white">{lead.companyName}</p>
+                              <p className="mt-1 truncate text-xs text-zinc-500">{lead.primaryPersonName}</p>
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-zinc-300">{lead.stageName || lead.stage}</TableCell>
+                          <TableCell><Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge></TableCell>
+                          <TableCell className="text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</TableCell>
+                          <TableCell className="text-zinc-500">{daysAgo(lead.latestActivityAt)}</TableCell>
+                        </TableRow>
+                      ))}
+                      {!selectedRow.leads.length ? (
+                        <TableRow className="border-white/8">
+                          <TableCell colSpan={5} className="py-8 text-center text-sm text-zinc-500">No deals are currently sourced from this channel.</TableCell>
+                        </TableRow>
+                      ) : null}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+                <CardHeader>
+                  <CardTitle>Recent evidence</CardTitle>
+                  <CardDescription>Latest messages feeding this channel.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3">
+                  {recentMessages.map(message => {
+                    const lead = workspace.leads.find(candidate => candidate.id === message.leadId)
+                    return (
+                      <button key={message.id} type="button" onClick={() => lead ? actions.selectLead(lead.id) : undefined} className={cn(pillInsetClass, 'p-4 text-left transition hover:bg-white/[0.07]')}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="truncate text-sm font-semibold text-white">{lead?.companyName ?? selectedRow.channel.name}</p>
+                          <span className="text-xs text-zinc-500">{shortDate(message.sentAt)}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-zinc-500">{message.from === 'rep' ? 'Rep' : 'Buyer'}</p>
+                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-zinc-300">{message.text}</p>
+                      </button>
+                    )
+                  })}
+                  {!recentMessages.length ? (
+                    <div className={cn(pillInsetClass, 'p-6 text-center text-sm text-zinc-500')}>No messages captured for this channel yet.</div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        ) : null}
+      </section>
     </section>
   )
 }
