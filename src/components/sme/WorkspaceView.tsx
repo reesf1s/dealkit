@@ -2656,134 +2656,307 @@ function ForecastView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
 
 function ReportsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
   const [now, setNow] = useState(0)
+  const [reportMode, setReportMode] = useState<'board' | 'hygiene' | 'channels'>('board')
+  const [busyReportAction, setBusyReportAction] = useState<string | null>(null)
+  const [reportNotice, setReportNotice] = useState<string | null>(null)
   useEffect(() => {
     setNow(Date.now())
   }, [])
   const reports = useReports(workspace, now)
   const maxStage = Math.max(...reports.stageRows.map(row => row.pipeline), 1)
   const valueOf = (leads: CrmLeadDto[]) => leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0)
+  const activePipeline = [...workspace.leads]
+    .filter(lead => lead.status !== 'won' && lead.status !== 'lost')
+    .sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0))
+  const coverageGaps = reports.coverageRows.filter(row => row.coverage < 3).slice(0, 5)
+  const boardRisks = [
+    ...coverageGaps.map(row => ({
+      id: `coverage:${row.lead.id}`,
+      lead: row.lead,
+      label: 'Coverage gap',
+      detail: `${row.messages} messages · ${row.activities} activities · ${row.tasks} tasks`,
+      taskTitle: 'Add evidence and next-step coverage',
+      taskDescription: `Review evidence coverage for ${row.lead.companyName}. Capture the latest buyer signal, confirm the next step, and attach the source to the deal.`,
+      priority: 'medium' as const,
+      tone: 'border-blue-300/20 bg-blue-300/10 text-blue-100',
+    })),
+    ...reports.riskyLeads.slice(0, 4).map(lead => ({
+      id: `risk:${lead.id}`,
+      lead,
+      label: 'Risk review',
+      detail: `${lead.probability}% confidence · ${money(Number(lead.valueAmount ?? 0))}`,
+      taskTitle: 'Manager risk review',
+      taskDescription: `Inspect risk on ${lead.companyName}. Confirm mutual action plan, blocker, commercial owner, and the next customer-facing step.`,
+      priority: 'high' as const,
+      tone: 'border-red-300/20 bg-red-300/10 text-red-100',
+    })),
+    ...reports.staleLeads.slice(0, 4).map(lead => ({
+      id: `stale:${lead.id}`,
+      lead,
+      label: 'Stale activity',
+      detail: `${daysAgo(lead.latestActivityAt)} · ${lead.nextStep || 'No next step'}`,
+      taskTitle: 'Refresh stale deal activity',
+      taskDescription: `Refresh ${lead.companyName}. Log the latest customer touch, verify close timing, and either create a next step or move it out of active forecast.`,
+      priority: 'medium' as const,
+      tone: 'border-yellow-300/20 bg-yellow-300/10 text-yellow-100',
+    })),
+  ].filter((item, index, items) => items.findIndex(candidate => candidate.id === item.id) === index)
+    .slice(0, 8)
+  const existingTaskTitles = new Set(workspace.tasks.map(task => `${task.companyName}:${(task.title ?? '').trim().toLowerCase()}`))
+  const topStage = reports.stageRows[0]
+  const riskShare = reports.totalPipeline ? Math.round((valueOf(reports.riskyLeads) / reports.totalPipeline) * 100) : 0
+  const activityCoverage = activePipeline.length
+    ? Math.round(((activePipeline.length - reports.coverageRows.filter(row => row.coverage === 0).length) / activePipeline.length) * 100)
+    : 0
+  const boardNarrative = [
+    topStage ? `${topStage.stage} holds the largest open value at ${money(topStage.pipeline)}.` : 'No active stage data yet.',
+    `${money(valueOf(reports.riskyLeads))} is in low-confidence or hot-risk deals.`,
+    `${reports.staleLeads.length} deals need fresh activity before the next management readout.`,
+  ]
+
+  async function createReportTask(item: (typeof boardRisks)[number]) {
+    const key = `${item.lead.companyName}:${item.taskTitle.toLowerCase()}`
+    if (existingTaskTitles.has(key)) {
+      setReportNotice('That report task already exists')
+      return
+    }
+    setBusyReportAction(item.id)
+    setReportNotice(null)
+    try {
+      await apiJson('/api/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: item.lead.id,
+          title: item.taskTitle,
+          description: `${item.taskDescription}\n\nCurrent next step: ${item.lead.nextStep || 'Confirm the next step.'}`,
+          priority: item.priority,
+          companyName: item.lead.companyName,
+          personName: item.lead.primaryPersonName,
+        }),
+      })
+      await actions.refresh()
+      setReportNotice('Report task created')
+    } finally {
+      setBusyReportAction(null)
+    }
+  }
 
   return (
     <section className="grid gap-4">
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Pipeline coverage" value={money(reports.totalPipeline)} detail={`${reports.stageRows.length} active stages in management review.`} icon={TrendingUp} />
         <StatCard label="Weighted number" value={money(reports.weightedPipeline)} detail="Probability-adjusted revenue confidence." icon={Gauge} />
-        <StatCard label="Risk concentration" value={money(valueOf(reports.riskyLeads))} detail={`${reports.riskyLeads.length} deals with low confidence or hot risk.`} icon={ShieldAlert} />
-        <StatCard label="Activity coverage" value={`${reports.messages.length + workspace.activities.length}`} detail={`${workspace.tasks.length} open tasks tied to sales execution.`} icon={MessageCircle} />
+        <StatCard label="Risk concentration" value={`${riskShare}%`} detail={`${money(valueOf(reports.riskyLeads))} needs inspection.`} icon={ShieldAlert} />
+        <StatCard label="Activity coverage" value={`${activityCoverage}%`} detail={`${coverageGaps.length} deals have thin evidence.`} icon={MessageCircle} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-          <CardHeader>
-            <CardTitle>Funnel report</CardTitle>
-            <CardDescription>Stage quality, conversion proxy, weighted value, and risk concentration.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {reports.stageRows.map(row => (
-              <div key={row.stage} className={cn(pillInsetClass, 'p-4')}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-white">{row.stage}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{row.deals} deals · {row.avgProbability}% average probability · {row.risk} risky</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-white">{money(row.pipeline)}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{money(row.weighted)} weighted</p>
-                  </div>
+      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <CardContent className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">Board pack</Badge>
+              {reportNotice ? <Badge variant="outline" className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">{reportNotice}</Badge> : null}
+            </div>
+            <h2 className="mt-4 font-title text-2xl font-semibold tracking-normal text-white">Weekly revenue readout</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+              A management view for the state of the number: where value sits, what is under-evidenced, and which follow-up work should be created.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {boardNarrative.map(item => (
+                <div key={item} className={cn(pillInsetClass, 'p-4')}>
+                  <p className="text-sm leading-6 text-zinc-300">{item}</p>
                 </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div className="h-full rounded-full bg-blue-400" style={{ width: `${Math.max(8, (row.pipeline / maxStage) * 100)}%` }} />
+              ))}
+            </div>
+          </div>
+          <div className={cn(pillInsetClass, 'grid content-between gap-4 p-4')}>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Commit', value: money(valueOf(reports.commit)) },
+                { label: 'Best case', value: money(valueOf(reports.bestCase)) },
+                { label: 'Pipeline', value: money(valueOf(reports.openPipeline)) },
+              ].map(item => (
+                <div key={item.label} className="rounded-[18px] border border-white/8 bg-black/20 p-3">
+                  <p className="text-xs text-zinc-500">{item.label}</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{item.value}</p>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild className="rounded-full bg-white text-black hover:bg-zinc-200">
+                <a href="/api/crm/export?format=csv">
+                  <FileSpreadsheet className="size-4" />
+                  Export CSV
+                </a>
+              </Button>
+              <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                <a href="/api/crm/export?format=json">
+                  <FileText className="size-4" />
+                  Export JSON
+                </a>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-          <CardHeader>
-            <CardTitle>Forecast quality</CardTitle>
-            <CardDescription>Manager-ready view of commit, upside, and pipeline hygiene.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {[
-              { label: 'Commit', leads: reports.commit, tone: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' },
-              { label: 'Best case', leads: reports.bestCase, tone: 'border-yellow-300/20 bg-yellow-300/10 text-yellow-100' },
-              { label: 'Pipeline', leads: reports.openPipeline, tone: 'border-blue-300/20 bg-blue-300/10 text-blue-100' },
-              { label: 'Stale', leads: reports.staleLeads, tone: 'border-red-300/20 bg-red-300/10 text-red-100' },
-            ].map(item => (
-              <div key={item.label} className={cn(pillInsetClass, 'flex items-center justify-between gap-3 p-4')}>
-                <div>
-                  <Badge variant="outline" className={item.tone}>{item.label}</Badge>
-                  <p className="mt-3 text-sm text-zinc-400">{item.leads.length} deals</p>
-                </div>
-                <p className="text-lg font-semibold text-white">{money(valueOf(item.leads))}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs value={reportMode} onValueChange={value => setReportMode(value as typeof reportMode)} className="grid gap-4">
+        <TabsList className={cn(pillSurfaceClass, 'h-auto w-fit flex-wrap justify-start bg-[#101316] p-1')}>
+          <TabsTrigger value="board" className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:text-black">Board view</TabsTrigger>
+          <TabsTrigger value="hygiene" className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:text-black">Hygiene queue</TabsTrigger>
+          <TabsTrigger value="channels" className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:text-black">Channel ROI</TabsTrigger>
+        </TabsList>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-          <CardHeader>
-            <CardTitle>Channel performance</CardTitle>
-            <CardDescription>Revenue channels only: email, LinkedIn, web chat, and meetings.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="text-zinc-500">Channel</TableHead>
-                  <TableHead className="text-zinc-500">Deals</TableHead>
-                  <TableHead className="text-zinc-500">Messages</TableHead>
-                  <TableHead className="text-zinc-500">Pipeline</TableHead>
-                  <TableHead className="text-zinc-500">Weighted</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reports.channelRows.map(row => (
-                  <TableRow key={row.id} className="border-white/8 hover:bg-white/[0.04]">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
+        <TabsContent value="board" className="mt-0 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Funnel report</CardTitle>
+              <CardDescription>Stage quality, conversion proxy, weighted value, and risk concentration.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {reports.stageRows.map(row => (
+                <div key={row.stage} className={cn(pillInsetClass, 'p-4')}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-white">{row.stage}</p>
+                      <p className="mt-1 text-xs text-zinc-500">{row.deals} deals · {row.avgProbability}% average probability · {row.risk} risky</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-white">{money(row.pipeline)}</p>
+                      <p className="mt-1 text-xs text-zinc-500">{money(row.weighted)} weighted</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                    <div className="h-full rounded-full bg-blue-400" style={{ width: `${Math.max(8, (row.pipeline / maxStage) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Management questions</CardTitle>
+              <CardDescription>Prompts worth answering before the revenue meeting.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {[
+                { label: 'Can we defend the commit?', value: `${reports.commit.length} commit deals`, detail: `${money(valueOf(reports.commit))} with 70%+ confidence.` },
+                { label: 'Where can upside convert?', value: `${reports.bestCase.length} best-case deals`, detail: `${money(valueOf(reports.bestCase))} needs clear next steps.` },
+                { label: 'What should leave forecast?', value: `${reports.staleLeads.length} stale deals`, detail: 'No recent evidence should not sit quietly in active pipeline.' },
+              ].map(item => (
+                <div key={item.label} className={cn(pillInsetClass, 'p-4')}>
+                  <p className="text-xs text-zinc-500">{item.label}</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{item.value}</p>
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">{item.detail}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="hygiene" className="mt-0 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Revenue hygiene queue</CardTitle>
+              <CardDescription>Create real work from the gaps exposed by the report.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {boardRisks.map(item => {
+                const taskExists = existingTaskTitles.has(`${item.lead.companyName}:${item.taskTitle.toLowerCase()}`)
+                return (
+                  <div key={item.id} className={cn(pillInsetClass, 'grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center')}>
+                    <button type="button" onClick={() => actions.selectLead(item.lead.id)} className="min-w-0 text-left">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={item.tone}>{item.label}</Badge>
+                        <span className="text-xs text-zinc-500">{item.detail}</span>
+                      </div>
+                      <p className="mt-3 truncate text-sm font-semibold text-white">{item.lead.companyName}</p>
+                      <p className="mt-1 truncate text-xs text-zinc-500">{item.lead.nextStep || 'No next step captured'}</p>
+                    </button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busyReportAction === item.id || taskExists}
+                      onClick={() => void createReportTask(item)}
+                      className="rounded-full bg-white text-black hover:bg-zinc-200 disabled:opacity-50"
+                    >
+                      <Plus className="size-4" />
+                      {taskExists ? 'Task exists' : 'Create task'}
+                    </Button>
+                  </div>
+                )
+              })}
+              {!boardRisks.length ? (
+                <div className={cn(pillInsetClass, 'p-6 text-center text-sm text-zinc-500')}>No report hygiene work is needed right now.</div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Coverage gaps</CardTitle>
+              <CardDescription>Deals with the thinnest evidence, activity, and task coverage.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {reports.coverageRows.slice(0, 8).map(row => (
+                <button key={row.lead.id} type="button" onClick={() => actions.selectLead(row.lead.id)} className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07]')}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{row.lead.companyName}</p>
+                    <p className="mt-1 truncate text-xs text-zinc-500">{row.lead.nextStep}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.messages} msgs</Badge>
+                    <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.activities} acts</Badge>
+                    <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.tasks} tasks</Badge>
+                  </div>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="channels" className="mt-0">
+          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+            <CardHeader>
+              <CardTitle>Channel performance</CardTitle>
+              <CardDescription>Revenue channels only: email, LinkedIn, web chat, and meetings.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead className="text-zinc-500">Channel</TableHead>
+                    <TableHead className="text-zinc-500">Status</TableHead>
+                    <TableHead className="text-zinc-500">Deals</TableHead>
+                    <TableHead className="text-zinc-500">Messages</TableHead>
+                    <TableHead className="text-zinc-500">Pipeline</TableHead>
+                    <TableHead className="text-zinc-500">Weighted</TableHead>
+                    <TableHead className="text-zinc-500">Yield</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reports.channelRows.map(row => (
+                    <TableRow key={row.id} className="border-white/8 hover:bg-white/[0.04]">
+                      <TableCell className="font-medium text-white">{row.name}</TableCell>
+                      <TableCell>
                         <Badge variant="outline" className={row.connected ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-zinc-500/20 bg-zinc-500/10 text-zinc-300'}>
                           {row.connected ? 'Live' : 'Pending'}
                         </Badge>
-                        <span className="font-medium text-white">{row.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-zinc-300">{row.deals}</TableCell>
-                    <TableCell className="text-zinc-300">{row.messages}</TableCell>
-                    <TableCell className="text-zinc-300">{money(row.pipeline)}</TableCell>
-                    <TableCell className="text-zinc-300">{money(row.weighted)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-          <CardHeader>
-            <CardTitle>Coverage gaps</CardTitle>
-            <CardDescription>Deals with the thinnest evidence, activity, and task coverage.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {reports.coverageRows.slice(0, 6).map(row => (
-              <button key={row.lead.id} type="button" onClick={() => actions.selectLead(row.lead.id)} className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[minmax(0,1fr)_auto] md:items-center')}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{row.lead.companyName}</p>
-                  <p className="mt-1 truncate text-xs text-zinc-500">{row.lead.nextStep}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 md:justify-end">
-                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.messages} msgs</Badge>
-                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.activities} acts</Badge>
-                  <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-zinc-300">{row.tasks} tasks</Badge>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+                      </TableCell>
+                      <TableCell className="text-zinc-300">{row.deals}</TableCell>
+                      <TableCell className="text-zinc-300">{row.messages}</TableCell>
+                      <TableCell className="text-zinc-300">{money(row.pipeline)}</TableCell>
+                      <TableCell className="text-zinc-300">{money(row.weighted)}</TableCell>
+                      <TableCell className="text-zinc-500">{row.messages ? money(Math.round(row.pipeline / row.messages)) : 'No evidence'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </section>
   )
 }
