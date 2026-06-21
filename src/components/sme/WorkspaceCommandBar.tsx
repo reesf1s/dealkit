@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { pillInsetClass, pillSurfaceClass } from '@/components/sme/halvex-system'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,21 @@ type LeadForm = {
   nextStep: string
 }
 
+type TaskForm = {
+  leadId: string
+  title: string
+  description: string
+  priority: 'low' | 'medium' | 'high'
+  dueAt: string
+}
+
+type ActivityForm = {
+  leadId: string
+  type: string
+  title: string
+  body: string
+}
+
 function defaultCloseDateInput() {
   const closeDate = new Date()
   closeDate.setDate(closeDate.getDate() + 14)
@@ -55,6 +71,16 @@ const emptyLeadForm: LeadForm = {
   risk: 'new',
   description: '',
   nextStep: '',
+}
+
+function defaultDueDateInput() {
+  const due = new Date()
+  due.setDate(due.getDate() + 1)
+  return due.toISOString().slice(0, 10)
+}
+
+function leadOptionLabel(lead: CrmLeadDto) {
+  return `${lead.companyName ?? lead.title ?? 'Untitled deal'} · ${lead.primaryPersonName ?? 'No buyer'}`
 }
 
 function resultIcon(type: SearchResult['type']) {
@@ -97,6 +123,20 @@ async function createLead(form: LeadForm) {
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload.error ?? 'Unable to create deal')
   return payload as { lead: CrmLeadDto }
+}
+
+async function apiJson<T>(path: string, init: RequestInit) {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...init.headers,
+    },
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error ?? `Request failed: ${response.status}`)
+  return payload as T
 }
 
 function buildIndex(workspace: CrmWorkspacePayload | null): SearchResult[] {
@@ -164,7 +204,10 @@ export default function WorkspaceCommandBar() {
   const [query, setQuery] = useState('')
   const [focused, setFocused] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [commandMode, setCommandMode] = useState<'deal' | 'task' | 'activity'>('deal')
   const [form, setForm] = useState<LeadForm>(emptyLeadForm)
+  const [taskForm, setTaskForm] = useState<TaskForm>({ leadId: '', title: '', description: '', priority: 'medium', dueAt: defaultDueDateInput() })
+  const [activityForm, setActivityForm] = useState<ActivityForm>({ leadId: '', type: 'note', title: '', body: '' })
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -180,6 +223,12 @@ export default function WorkspaceCommandBar() {
   useEffect(() => {
     void refresh()
   }, [])
+
+  useEffect(() => {
+    const firstLeadId = workspace?.leads[0]?.id ?? ''
+    if (firstLeadId && !taskForm.leadId) setTaskForm(current => ({ ...current, leadId: firstLeadId }))
+    if (firstLeadId && !activityForm.leadId) setActivityForm(current => ({ ...current, leadId: firstLeadId }))
+  }, [activityForm.leadId, taskForm.leadId, workspace])
 
   const index = useMemo(() => buildIndex(workspace), [workspace])
   const filtered = useMemo(() => {
@@ -210,6 +259,69 @@ export default function WorkspaceCommandBar() {
     }
   }
 
+  async function handleCreateTask() {
+    const lead = workspace?.leads.find(item => item.id === taskForm.leadId)
+    if (!taskForm.title.trim()) {
+      setError('Task title is required')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await apiJson('/api/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: lead?.id,
+          title: taskForm.title.trim(),
+          description: taskForm.description.trim() || 'Created from the command bar.',
+          priority: taskForm.priority,
+          dueAt: taskForm.dueAt ? new Date(`${taskForm.dueAt}T10:00:00.000Z`).toISOString() : undefined,
+          companyName: lead?.companyName,
+          personName: lead?.primaryPersonName,
+        }),
+      })
+      setNotice(`Task created${lead?.companyName ? ` for ${lead.companyName}` : ''}`)
+      setTaskForm({ leadId: lead?.id ?? workspace?.leads[0]?.id ?? '', title: '', description: '', priority: 'medium', dueAt: defaultDueDateInput() })
+      await refresh()
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Unable to create task')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleLogActivity() {
+    const lead = workspace?.leads.find(item => item.id === activityForm.leadId)
+    if (!activityForm.title.trim()) {
+      setError('Activity title is required')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await apiJson('/api/crm/activities', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: lead?.id,
+          title: activityForm.title.trim(),
+          body: activityForm.body.trim() || 'Logged from the command bar.',
+          type: activityForm.type,
+          companyName: lead?.companyName,
+          personName: lead?.primaryPersonName,
+        }),
+      })
+      setNotice(`Activity logged${lead?.companyName ? ` for ${lead.companyName}` : ''}`)
+      setActivityForm({ leadId: lead?.id ?? workspace?.leads[0]?.id ?? '', type: 'note', title: '', body: '' })
+      await refresh()
+    } catch (activityError) {
+      setError(activityError instanceof Error ? activityError.message : 'Unable to log activity')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
       <div className="relative min-w-0 flex-1">
@@ -229,7 +341,10 @@ export default function WorkspaceCommandBar() {
               <button
                 type="button"
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => setCreateOpen(true)}
+                onClick={() => {
+                  setCommandMode('deal')
+                  setCreateOpen(true)
+                }}
                 className={cn(pillInsetClass, 'flex items-center justify-between gap-3 p-3 text-left transition hover:bg-white/[0.07]')}
               >
                 <span className="flex items-center gap-3 text-sm font-medium text-white">
@@ -238,6 +353,38 @@ export default function WorkspaceCommandBar() {
                 </span>
                 <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">New</Badge>
               </button>
+              <div className="grid gap-1 md:grid-cols-2">
+                <button
+                  type="button"
+                  onMouseDown={event => event.preventDefault()}
+                  onClick={() => {
+                    setCommandMode('task')
+                    setCreateOpen(true)
+                  }}
+                  className={cn(pillInsetClass, 'flex items-center gap-3 p-3 text-left transition hover:bg-white/[0.07]')}
+                >
+                  <span className="grid size-8 place-items-center rounded-full bg-white/[0.06] text-zinc-300"><CheckSquare className="size-4" /></span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-white">Create task</span>
+                    <span className="mt-0.5 block truncate text-xs text-zinc-500">Assign follow-up work</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={event => event.preventDefault()}
+                  onClick={() => {
+                    setCommandMode('activity')
+                    setCreateOpen(true)
+                  }}
+                  className={cn(pillInsetClass, 'flex items-center gap-3 p-3 text-left transition hover:bg-white/[0.07]')}
+                >
+                  <span className="grid size-8 place-items-center rounded-full bg-white/[0.06] text-zinc-300"><CalendarClock className="size-4" /></span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-white">Log activity</span>
+                    <span className="mt-0.5 block truncate text-xs text-zinc-500">Capture evidence fast</span>
+                  </span>
+                </button>
+              </div>
 
               {filtered.map(item => (
                 <Link
@@ -262,48 +409,92 @@ export default function WorkspaceCommandBar() {
         ) : null}
       </div>
 
-      <Button type="button" onClick={() => setCreateOpen(true)} className="hidden rounded-full bg-white text-xs text-black hover:bg-zinc-200 md:inline-flex">
+      <Button type="button" onClick={() => {
+        setCommandMode('deal')
+        setCreateOpen(true)
+      }} className="hidden rounded-full bg-white text-xs text-black hover:bg-zinc-200 md:inline-flex">
         <Plus className="size-4" />
-        New deal
+        New
       </Button>
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
         <SheetContent side="right" className="w-full overflow-y-auto border-white/10 bg-[#080a0d] p-0 text-zinc-100 sm:max-w-2xl">
           <SheetHeader className="border-b border-white/10 p-6">
-            <SheetTitle className="font-title text-2xl text-white">Create deal</SheetTitle>
-            <SheetDescription className="text-zinc-400">Add a new account, buyer, value, forecast signal, and next step.</SheetDescription>
+            <SheetTitle className="font-title text-2xl text-white">Command drawer</SheetTitle>
+            <SheetDescription className="text-zinc-400">Create pipeline, assign work, or capture deal evidence without leaving the current page.</SheetDescription>
           </SheetHeader>
           <div className="grid gap-4 p-6">
             {notice ? <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">{notice}</div> : null}
             {error ? <div className="rounded-full border border-red-300/20 bg-red-300/10 px-4 py-2 text-sm text-red-100">{error}</div> : null}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Label className="grid gap-2 text-xs text-zinc-500">Company<Input value={form.companyName} onChange={event => setForm({ ...form, companyName: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Primary buyer<Input value={form.primaryPersonName} onChange={event => setForm({ ...form, primaryPersonName: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Owner<Input value={form.owner} onChange={event => setForm({ ...form, owner: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Stage<Input value={form.stage} onChange={event => setForm({ ...form, stage: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Value<Input type="number" value={form.valueAmount} onChange={event => setForm({ ...form, valueAmount: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Probability<Input type="number" value={form.probability} onChange={event => setForm({ ...form, probability: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Close date<Input type="date" value={form.expectedCloseDate} onChange={event => setForm({ ...form, expectedCloseDate: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Channel<select value={form.channel} onChange={event => setForm({ ...form, channel: event.target.value as ChannelId })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="mail">Email</option><option value="linkedin">LinkedIn</option><option value="webchat">Web chat</option><option value="meetings">Calls & meetings</option></select></Label>
-              <Label className="grid gap-2 text-xs text-zinc-500">Risk<select value={form.risk} onChange={event => setForm({ ...form, risk: event.target.value as CrmLeadDto['risk'] })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="new">New</option><option value="warm">Warm</option><option value="hot">Hot</option></select></Label>
-            </div>
+            <Tabs value={commandMode} onValueChange={value => setCommandMode(value as typeof commandMode)} className="grid gap-4">
+              <TabsList className="h-auto w-fit rounded-full border border-white/10 bg-white/[0.04] p-1">
+                <TabsTrigger value="deal" className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:text-black">Deal</TabsTrigger>
+                <TabsTrigger value="task" className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:text-black">Task</TabsTrigger>
+                <TabsTrigger value="activity" className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:text-black">Activity</TabsTrigger>
+              </TabsList>
 
-            <Label className="grid gap-2 text-xs text-zinc-500">Description<Textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} className="min-h-24 rounded-[22px] border-white/10 bg-black/20 text-white" /></Label>
-            <Label className="grid gap-2 text-xs text-zinc-500">Next step<Textarea value={form.nextStep} onChange={event => setForm({ ...form, nextStep: event.target.value })} className="min-h-24 rounded-[22px] border-white/10 bg-black/20 text-white" /></Label>
+              <TabsContent value="deal" className="mt-0 grid gap-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Label className="grid gap-2 text-xs text-zinc-500">Company<Input value={form.companyName} onChange={event => setForm({ ...form, companyName: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Primary buyer<Input value={form.primaryPersonName} onChange={event => setForm({ ...form, primaryPersonName: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Owner<Input value={form.owner} onChange={event => setForm({ ...form, owner: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Stage<Input value={form.stage} onChange={event => setForm({ ...form, stage: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Value<Input type="number" value={form.valueAmount} onChange={event => setForm({ ...form, valueAmount: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Probability<Input type="number" value={form.probability} onChange={event => setForm({ ...form, probability: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Close date<Input type="date" value={form.expectedCloseDate} onChange={event => setForm({ ...form, expectedCloseDate: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Channel<select value={form.channel} onChange={event => setForm({ ...form, channel: event.target.value as ChannelId })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="mail">Email</option><option value="linkedin">LinkedIn</option><option value="webchat">Web chat</option><option value="meetings">Calls & meetings</option></select></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Risk<select value={form.risk} onChange={event => setForm({ ...form, risk: event.target.value as CrmLeadDto['risk'] })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="new">New</option><option value="warm">Warm</option><option value="hot">Hot</option></select></Label>
+                </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => void handleCreate()} disabled={busy} className="rounded-full bg-white text-black hover:bg-zinc-200">
-                <Send className="size-4" />
-                {busy ? 'Creating...' : 'Create deal'}
-              </Button>
-              <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
-                <Link href="/deals">Open pipeline</Link>
-              </Button>
-              <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
-                <Link href="/coach"><Bot className="size-4" /> Coach</Link>
-              </Button>
-            </div>
+                <Label className="grid gap-2 text-xs text-zinc-500">Description<Textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} className="min-h-24 rounded-[22px] border-white/10 bg-black/20 text-white" /></Label>
+                <Label className="grid gap-2 text-xs text-zinc-500">Next step<Textarea value={form.nextStep} onChange={event => setForm({ ...form, nextStep: event.target.value })} className="min-h-24 rounded-[22px] border-white/10 bg-black/20 text-white" /></Label>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={() => void handleCreate()} disabled={busy} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                    <Send className="size-4" />
+                    {busy ? 'Creating...' : 'Create deal'}
+                  </Button>
+                  <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+                    <Link href="/deals">Open pipeline</Link>
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="task" className="mt-0 grid gap-4">
+                <Label className="grid gap-2 text-xs text-zinc-500">Deal<select value={taskForm.leadId} onChange={event => setTaskForm({ ...taskForm, leadId: event.target.value })} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none">{workspace?.leads.map(lead => <option key={lead.id} value={lead.id}>{leadOptionLabel(lead)}</option>)}</select></Label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Label className="grid gap-2 text-xs text-zinc-500">Title<Input value={taskForm.title} onChange={event => setTaskForm({ ...taskForm, title: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Due date<Input type="date" value={taskForm.dueAt} onChange={event => setTaskForm({ ...taskForm, dueAt: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Priority<select value={taskForm.priority} onChange={event => setTaskForm({ ...taskForm, priority: event.target.value as TaskForm['priority'] })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></Label>
+                </div>
+                <Label className="grid gap-2 text-xs text-zinc-500">Description<Textarea value={taskForm.description} onChange={event => setTaskForm({ ...taskForm, description: event.target.value })} className="min-h-28 rounded-[22px] border-white/10 bg-black/20 text-white" /></Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={() => void handleCreateTask()} disabled={busy || !workspace?.leads.length} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                    <CheckSquare className="size-4" />
+                    {busy ? 'Creating...' : 'Create task'}
+                  </Button>
+                  <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100"><Link href="/tasks">Open tasks</Link></Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="activity" className="mt-0 grid gap-4">
+                <Label className="grid gap-2 text-xs text-zinc-500">Deal<select value={activityForm.leadId} onChange={event => setActivityForm({ ...activityForm, leadId: event.target.value })} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none">{workspace?.leads.map(lead => <option key={lead.id} value={lead.id}>{leadOptionLabel(lead)}</option>)}</select></Label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Label className="grid gap-2 text-xs text-zinc-500">Title<Input value={activityForm.title} onChange={event => setActivityForm({ ...activityForm, title: event.target.value })} className="rounded-full border-white/10 bg-black/20 text-white" /></Label>
+                  <Label className="grid gap-2 text-xs text-zinc-500">Type<select value={activityForm.type} onChange={event => setActivityForm({ ...activityForm, type: event.target.value })} className="h-9 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-white outline-none"><option value="note">Note</option><option value="call">Call</option><option value="meeting">Meeting</option><option value="risk">Risk</option><option value="intent">Decision signal</option></select></Label>
+                </div>
+                <Label className="grid gap-2 text-xs text-zinc-500">Notes<Textarea value={activityForm.body} onChange={event => setActivityForm({ ...activityForm, body: event.target.value })} className="min-h-36 rounded-[22px] border-white/10 bg-black/20 text-white" /></Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={() => void handleLogActivity()} disabled={busy || !workspace?.leads.length} className="rounded-full bg-white text-black hover:bg-zinc-200">
+                    <CalendarClock className="size-4" />
+                    {busy ? 'Logging...' : 'Log activity'}
+                  </Button>
+                  <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100"><Link href="/meetings">Open meetings</Link></Button>
+                  <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100"><Link href="/coach"><Bot className="size-4" /> Coach</Link></Button>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </SheetContent>
       </Sheet>
