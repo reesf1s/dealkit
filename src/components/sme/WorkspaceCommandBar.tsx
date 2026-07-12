@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { ArrowUpRight, Bot, Building2, CalendarClock, CheckSquare, MessageCircle, Plus, Search, Send, Users } from 'lucide-react'
 
 import type { ChannelId, CrmLeadDto, CrmWorkspacePayload } from '@/lib/sme-crm'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -332,60 +331,12 @@ export default function WorkspaceCommandBar() {
           onChange={event => setQuery(event.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => window.setTimeout(() => setFocused(false), 140)}
-          placeholder="Search deals, accounts, messages, tasks..."
-          className="h-10 rounded-full border-white/8 bg-white/[0.06] pl-9 text-xs text-zinc-100 placeholder:text-zinc-500 shadow-none focus-visible:ring-white/20"
+          placeholder="Search workspace..."
+          className="h-9 rounded-lg border-white/8 bg-white/[0.045] pl-9 text-xs text-zinc-100 placeholder:text-zinc-500 shadow-none focus-visible:ring-white/20"
         />
         {focused ? (
           <div className={cn(pillSurfaceClass, 'absolute left-0 right-0 top-12 z-50 max-h-[520px] overflow-hidden bg-[#090b0d] p-2 shadow-2xl')}>
             <div className="grid gap-1">
-              <button
-                type="button"
-                onMouseDown={event => event.preventDefault()}
-                onClick={() => {
-                  setCommandMode('deal')
-                  setCreateOpen(true)
-                }}
-                className={cn(pillInsetClass, 'flex items-center justify-between gap-3 p-3 text-left transition hover:bg-white/[0.07]')}
-              >
-                <span className="flex items-center gap-3 text-sm font-medium text-white">
-                  <span className="grid size-8 place-items-center rounded-full bg-white text-black"><Plus className="size-4" /></span>
-                  Create new deal
-                </span>
-                <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">New</Badge>
-              </button>
-              <div className="grid gap-1 md:grid-cols-2">
-                <button
-                  type="button"
-                  onMouseDown={event => event.preventDefault()}
-                  onClick={() => {
-                    setCommandMode('task')
-                    setCreateOpen(true)
-                  }}
-                  className={cn(pillInsetClass, 'flex items-center gap-3 p-3 text-left transition hover:bg-white/[0.07]')}
-                >
-                  <span className="grid size-8 place-items-center rounded-full bg-white/[0.06] text-zinc-300"><CheckSquare className="size-4" /></span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-white">Create task</span>
-                    <span className="mt-0.5 block truncate text-xs text-zinc-500">Assign follow-up work</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={event => event.preventDefault()}
-                  onClick={() => {
-                    setCommandMode('activity')
-                    setCreateOpen(true)
-                  }}
-                  className={cn(pillInsetClass, 'flex items-center gap-3 p-3 text-left transition hover:bg-white/[0.07]')}
-                >
-                  <span className="grid size-8 place-items-center rounded-full bg-white/[0.06] text-zinc-300"><CalendarClock className="size-4" /></span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-white">Log activity</span>
-                    <span className="mt-0.5 block truncate text-xs text-zinc-500">Capture evidence fast</span>
-                  </span>
-                </button>
-              </div>
-
               {filtered.map(item => (
                 <Link
                   key={item.id}
@@ -412,7 +363,7 @@ export default function WorkspaceCommandBar() {
       <Button type="button" onClick={() => {
         setCommandMode('deal')
         setCreateOpen(true)
-      }} className="hidden rounded-full bg-white text-xs text-black hover:bg-zinc-200 md:inline-flex">
+      }} className="hidden h-9 rounded-lg bg-violet-500 px-3 text-xs text-white hover:bg-violet-400 md:inline-flex">
         <Plus className="size-4" />
         New
       </Button>

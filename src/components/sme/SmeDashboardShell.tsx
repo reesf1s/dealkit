@@ -33,7 +33,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import WorkspaceCommandBar from '@/components/sme/WorkspaceCommandBar'
-import WorkspaceSignals from '@/components/sme/WorkspaceSignals'
 import { cn } from '@/lib/utils'
 
 type NavLink = {
@@ -43,16 +42,16 @@ type NavLink = {
 }
 
 const navigation: NavLink[] = [
-  { href: '/home', label: 'Overview', icon: Home },
+  { href: '/home', label: 'Home', icon: Home },
   { href: '/deals', label: 'Deals', icon: TrendingUp },
   { href: '/inbox', label: 'Inbox', icon: MessagesSquare },
-  { href: '/forecast', label: 'Forecast', icon: BarChart3 },
-  { href: '/coach', label: 'Intelligence', icon: Bot },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
 ]
 
 const workspaceNavigation: NavLink[] = [
+  { href: '/forecast', label: 'Forecast', icon: BarChart3 },
+  { href: '/coach', label: 'Intelligence', icon: Bot },
   { href: '/accounts', label: 'Accounts', icon: Building2 },
-  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/meetings', label: 'Meetings', icon: CalendarDays },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/reports', label: 'Reports', icon: TrendingUp },
@@ -108,20 +107,20 @@ function WorkspaceMenu() {
             menuActive && 'bg-white/[0.08] text-white',
           )}
         >
-          More
+          Workspace
           <ChevronDown className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72 rounded-2xl border-white/10 bg-[#11101a]/98 p-2 text-zinc-100 shadow-2xl backdrop-blur-xl">
-        <DropdownMenuLabel className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">Workspace</DropdownMenuLabel>
-        <div className="grid grid-cols-2 gap-1">
+      <DropdownMenuContent align="start" className="max-h-[72vh] w-64 overflow-y-auto rounded-xl border-white/10 bg-[#11101a]/98 p-2 text-zinc-100 shadow-2xl backdrop-blur-xl">
+        <DropdownMenuLabel className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">All areas</DropdownMenuLabel>
+        <div className="grid gap-0.5">
           {workspaceNavigation.slice(0, 9).map(item => {
             const Icon = item.icon
             return (
-              <DropdownMenuItem key={item.href} asChild className="rounded-xl p-0 focus:bg-white/[0.07] focus:text-white">
-                <Link href={item.href} className="flex min-h-14 items-center gap-2.5 px-3 py-2">
-                  <span className="grid size-8 place-items-center rounded-lg border border-white/8 bg-white/[0.05] text-violet-300"><Icon className="size-3.5" /></span>
-                  <span className="text-xs font-medium">{item.label}</span>
+              <DropdownMenuItem key={item.href} asChild className="rounded-lg p-0 focus:bg-white/[0.07] focus:text-white">
+                <Link href={item.href} className="flex items-center gap-3 px-3 py-2.5">
+                  <Icon className="size-4 text-zinc-500" />
+                  <span className="text-sm">{item.label}</span>
                 </Link>
               </DropdownMenuItem>
             )
@@ -132,7 +131,7 @@ function WorkspaceMenu() {
           const Icon = item.icon
           return (
             <DropdownMenuItem key={item.href} asChild className="rounded-xl focus:bg-white/[0.07] focus:text-white">
-              <Link href={item.href} className="gap-3 px-3 py-2.5 text-xs"><Icon className="size-4 text-zinc-500" />{item.label}</Link>
+              <Link href={item.href} className="gap-3 px-3 py-2.5 text-sm"><Icon className="size-4 text-zinc-500" />{item.label}</Link>
             </DropdownMenuItem>
           )
         })}
@@ -145,7 +144,7 @@ export default function SmeDashboardShell({ children }: { children: ReactNode })
   return (
     <div className="min-h-screen bg-[#090811] text-zinc-100">
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#090811]/90 backdrop-blur-2xl">
-        <div className="mx-auto flex h-16 max-w-[1680px] items-center gap-3 px-3 sm:px-5 lg:gap-5">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-3 sm:px-5 lg:gap-6">
           <Link href="/home" className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70" aria-label="Halvex overview">
             <span className="relative grid size-9 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-violet-500 via-violet-600 to-fuchsia-700 text-sm font-black text-white shadow-[0_10px_35px_rgba(139,92,246,0.3)]">
               H
@@ -162,9 +161,8 @@ export default function SmeDashboardShell({ children }: { children: ReactNode })
             <WorkspaceMenu />
           </div>
 
-          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 lg:max-w-[520px]">
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 lg:max-w-[430px]">
             <WorkspaceCommandBar />
-            <WorkspaceSignals />
             <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] shadow-inner">
               <UserButton />
             </div>
@@ -181,7 +179,7 @@ export default function SmeDashboardShell({ children }: { children: ReactNode })
 
       <main className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-[radial-gradient(circle_at_10%_0%,rgba(124,58,237,0.11),transparent_30%),radial-gradient(circle_at_90%_20%,rgba(192,38,211,0.06),transparent_24%)]">
         <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(rgba(255,255,255,.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.5)_1px,transparent_1px)] [background-size:48px_48px]" />
-        <div className="relative mx-auto w-full max-w-[1680px] p-3 sm:p-5 lg:p-6">
+        <div className="relative mx-auto w-full max-w-[1440px] p-3 sm:p-5 lg:p-8">
           {children}
         </div>
       </main>

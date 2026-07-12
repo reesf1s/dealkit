@@ -463,28 +463,11 @@ function signalTone(text: string) {
 function PageHeader({ view }: { view: WorkspaceViewName }) {
   const copy = VIEW_COPY[view]
   return (
-    <section className="grid gap-4 py-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+    <section className="py-2">
       <div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-300">
-          <span className="size-1.5 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.8)]" />
-          {copy.eyebrow}
-        </div>
-        <h1 className="mt-2 font-title text-2xl font-semibold tracking-tight text-white md:text-[30px]">{copy.title}</h1>
-        <p className="mt-1.5 max-w-3xl text-sm leading-6 text-zinc-500">{copy.description}</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button asChild className="rounded-lg bg-violet-500 text-white shadow-[0_8px_24px_rgba(124,58,237,0.25)] hover:bg-violet-400">
-          <Link href="/deals">
-            Open deals
-            <ArrowUpRight className="size-4" />
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="rounded-lg border-white/10 bg-white/[0.04] text-zinc-100 hover:bg-white/[0.08]">
-          <Link href="/coach">
-            AI actions
-            <Bot className="size-4" />
-          </Link>
-        </Button>
+        <p className="text-xs font-medium text-violet-300">{copy.eyebrow}</p>
+        <h1 className="mt-1.5 font-title text-2xl font-semibold tracking-tight text-white md:text-[28px]">{copy.title}</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">{copy.description}</p>
       </div>
     </section>
   )
@@ -603,8 +586,8 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
   const maxStageValue = Math.max(...metrics.stages.map(stage => stage.value), 1)
 
   return (
-    <div className="grid gap-4">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.7fr)]">
+    <div className="grid gap-6">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className={cn(pillSurfaceClass, 'relative overflow-hidden bg-[linear-gradient(135deg,#171426_0%,#111018_64%,#12111a_100%)]')}>
           <div className="pointer-events-none absolute -right-24 -top-32 size-80 rounded-full bg-violet-600/15 blur-3xl" />
           <CardHeader className="relative border-b border-white/[0.06] pb-5 md:flex md:flex-row md:items-start md:justify-between">
@@ -665,7 +648,7 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
             </div>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {recommendations.slice(0, 2).map((item, index) => (
+            {recommendations.slice(0, 1).map((item, index) => (
               <div key={item.id} className={cn(pillInsetClass, 'group p-4 transition-colors hover:border-violet-400/20')}>
                 <div className="flex items-start gap-3">
                   <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-violet-400/10 text-[10px] font-semibold text-violet-300">0{index + 1}</span>
@@ -684,14 +667,14 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
         </Card>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="hidden">
         <StatCard label="Open pipeline" value={money(metrics.total)} detail={`${workspace.leads.length} active deals across all channels.`} icon={TrendingUp} />
         <StatCard label="Weighted forecast" value={money(Math.round(metrics.weighted))} detail="Probability-adjusted value currently in play." icon={Gauge} />
         <StatCard label="At-risk work" value={`${metrics.risk}`} detail="Deals needing attention, proof, or a clearer next step." icon={ShieldAlert} />
         <StatCard label="Live channels" value={`${metrics.connected}/${workspace.channels.length}`} detail={`${metrics.messageCount} captured messages feeding the workspace.`} icon={PlugZap} />
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(340px,0.7fr)]">
+      <section className="grid gap-4">
         <Card className={cn(pillSurfaceClass, 'bg-[#12111a]/90')}>
           <CardHeader className="border-b border-white/[0.06] md:flex md:flex-row md:items-center md:justify-between">
             <div>
@@ -727,7 +710,7 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
           </CardContent>
         </Card>
 
-        <Card className={cn(pillSurfaceClass, 'bg-[#12111a]/90')}>
+        <Card className={cn(pillSurfaceClass, 'hidden bg-[#12111a]/90')}>
           <CardHeader>
             <CardTitle>Sales motion</CardTitle>
             <CardDescription>One connected workflow from capture to close.</CardDescription>
@@ -751,7 +734,7 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
         </Card>
       </section>
 
-      <Card className={cn(pillSurfaceClass, 'bg-[#12111a]/90')}>
+      <Card className={cn(pillSurfaceClass, 'hidden bg-[#12111a]/90')}>
         <CardHeader className="md:flex md:flex-row md:items-end md:justify-between">
           <div>
             <CardTitle>Revenue operations</CardTitle>
@@ -900,7 +883,12 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 
   return (
     <div className="grid gap-4">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
+      <details className={cn(pillSurfaceClass, 'group bg-[#101316] p-3')}>
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 py-1 text-sm font-medium text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70">
+          Pipeline insights
+          <span className="text-xs font-normal text-zinc-500">{money(pipelineValue)} open · {riskLeads.length} at risk</span>
+        </summary>
+        <section className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
         <Card className={cn(pillSurfaceClass, 'overflow-hidden bg-[#101316]')}>
           <CardHeader className="border-b border-white/8">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -980,9 +968,15 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
             </div>
           </CardContent>
         </Card>
-      </section>
+        </section>
+      </details>
 
-      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+      <details className={cn(pillSurfaceClass, 'group bg-[#101316] p-3')}>
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 py-1 text-sm font-medium text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70">
+          Pipeline board
+          <span className="text-xs font-normal text-zinc-500">Move deals between stages</span>
+        </summary>
+      <Card className="mt-3 border-0 bg-transparent shadow-none">
         <CardHeader>
           <CardTitle>Pipeline board</CardTitle>
           <CardDescription>Move opportunities through the sales process and close outcomes without leaving the pipeline.</CardDescription>
@@ -1035,6 +1029,7 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
           })}
         </CardContent>
       </Card>
+      </details>
 
       <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
         <CardHeader className="gap-4">
@@ -1042,8 +1037,10 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
             <CardTitle>Deal table</CardTitle>
             <CardDescription>Built for scanning, editing, notes, next steps, and follow-up work.</CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {savedViews.map(view => (
+          <details className="group">
+            <summary className="w-fit cursor-pointer list-none rounded-lg px-2 py-1 text-xs text-zinc-400 hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70">Saved views</summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {savedViews.map(view => (
               <Button
                 key={view.id}
                 type="button"
@@ -1056,8 +1053,9 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
               >
                 {view.name}
               </Button>
-            ))}
-          </div>
+              ))}
+            </div>
+          </details>
           <div className="grid gap-2 lg:grid-cols-[minmax(180px,1.2fr)_repeat(4,minmax(130px,0.75fr))]">
             <Input
               value={query}
@@ -1089,7 +1087,9 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
               <option value="meetings">Calls & meetings</option>
             </select>
           </div>
-          <div className={cn(pillInsetClass, 'grid gap-2 p-3 md:grid-cols-[1fr_140px_auto] md:items-center')}>
+          <details className="group">
+            <summary className="w-fit cursor-pointer list-none rounded-lg px-2 py-1 text-xs text-zinc-400 hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70">Save current view</summary>
+          <div className={cn(pillInsetClass, 'mt-2 grid gap-2 p-3 md:grid-cols-[1fr_140px_auto] md:items-center')}>
             <Input value={viewName} onChange={event => setViewName(event.target.value)} placeholder="Name this view..." className="h-10 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600" />
             <select value={minProbability} onChange={event => setMinProbability(event.target.value)} className="h-10 rounded-full border border-white/10 bg-black/40 px-3 text-sm text-zinc-100 outline-none">
               <option value="0">Any prob.</option>
@@ -1103,6 +1103,7 @@ function DealsView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
             </Button>
             {viewNotice ? <p className="text-xs text-zinc-500 md:col-span-3">{viewNotice}</p> : null}
           </div>
+          </details>
         </CardHeader>
         <CardContent>
           <Table>
@@ -1256,15 +1257,15 @@ function InboxView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 
   return (
     <div className="grid gap-4">
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="hidden">
         <StatCard label="Conversations" value={`${conversationRows.length}`} detail={`${allMessages.length} captured messages across channels.`} icon={MessageCircle} />
         <StatCard label="Needs reply" value={`${needsReplyRows.length}`} detail="Threads where the latest message came from the buyer." icon={Send} />
         <StatCard label="Hot threads" value={`${hotConversationRows.length}`} detail="Conversation streams attached to hot-risk deals." icon={ShieldAlert} />
         <StatCard label="Pipeline in inbox" value={money(inboxValue)} detail="Open value represented in current conversations." icon={TrendingUp} />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,0.9fr)_minmax(360px,0.9fr)]">
-        <div className="grid content-start gap-3">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(420px,1.2fr)]">
+        <div className="hidden">
           <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
             <CardHeader>
               <CardTitle>Channel health</CardTitle>
@@ -1808,7 +1809,7 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
 
   return (
     <section className="grid gap-4">
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="hidden">
         <StatCard label="Open tasks" value={`${taskRows.length}`} detail="Current execution load across active deals." icon={ClipboardList} />
         <StatCard label="Due now" value={`${dueNow}`} detail={`${overdue} already past due.`} icon={CalendarClock} />
         <StatCard label="Risk work" value={`${riskyCount}`} detail="High-priority or hot-deal follow-up." icon={ShieldAlert} />
@@ -1848,7 +1849,7 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <CardContent className="grid gap-4">
               <div className="grid gap-3">
                 <Input
                   value={query}
@@ -1856,7 +1857,7 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
                   placeholder="Search tasks..."
                   className="h-10 rounded-full border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-600"
                 />
-                <div className={cn(pillInsetClass, 'p-4')}>
+                <div className={cn(pillInsetClass, 'hidden p-4')}>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Owner load</p>
                   <div className="mt-4 grid gap-2">
                     {ownerRows.map(owner => (
@@ -1909,7 +1910,7 @@ function TasksView({ workspace, actions }: { workspace: CrmWorkspacePayload; act
             </CardContent>
           </Card>
 
-          <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+          <Card className={cn(pillSurfaceClass, 'hidden bg-[#101316]')}>
             <CardHeader>
               <CardTitle>Create next action</CardTitle>
               <CardDescription>Create useful work against a real deal, with due date and buyer context attached.</CardDescription>
