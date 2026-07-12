@@ -11,7 +11,7 @@ export default function SignInPage() {
   return (
     <AuthShell
       title="Welcome back"
-      description="Sign in to your rounded sales workspace."
+      description="Sign in to your revenue workspace."
       footer={(
         <>
           New to Halvex?{' '}

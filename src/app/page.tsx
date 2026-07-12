@@ -42,7 +42,7 @@ const rows = [
 ]
 
 const workflow = [
-  ['Inbox', 'Every revenue channel lands in one row-ready operating table.', MessagesSquare],
+  ['Inbox', 'Every revenue channel lands in one prioritized workspace.', MessagesSquare],
   ['Deal read', 'Risk, probability, owner, and evidence stay visible.', TrendingUp],
   ['AI next step', 'Drafts and coaching are grounded in the selected deal.', Bot],
 ]

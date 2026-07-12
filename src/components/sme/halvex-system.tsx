@@ -147,7 +147,7 @@ export function AuthShell({
           <section className="hidden lg:block">
             <BrandMark />
             <h1 className="mt-8 max-w-xl font-title text-5xl font-semibold leading-tight">
-              Revenue work, rounded into one calm operating table.
+              Run every deal from one clear revenue workspace.
             </h1>
             <div className="mt-8 grid max-w-xl gap-2">
               {['Unified conversations', 'Deal risk and next step rows', 'AI drafts grounded in CRM context'].map(item => (
