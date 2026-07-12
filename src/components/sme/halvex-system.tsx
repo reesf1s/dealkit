@@ -12,10 +12,10 @@ type BrandMarkProps = {
   className?: string
 }
 
-export const pillSurfaceClass = 'rounded-[28px] border border-white/10 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
-export const pillInsetClass = 'rounded-[22px] border border-white/10 bg-black/20'
-export const pillButtonClass = 'rounded-full border-white/10 bg-white/[0.06] text-zinc-100 hover:bg-white/[0.1]'
-export const tableRowClass = 'rounded-full border border-white/10 bg-white/[0.045] px-4 py-3 text-sm transition hover:bg-white/[0.075]'
+export const pillSurfaceClass = 'rounded-2xl border border-white/[0.08] bg-[#12111a]/90 shadow-[0_18px_60px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)]'
+export const pillInsetClass = 'rounded-xl border border-white/[0.07] bg-black/20'
+export const pillButtonClass = 'rounded-lg border-white/10 bg-white/[0.06] text-zinc-100 hover:bg-white/[0.1]'
+export const tableRowClass = 'rounded-xl border border-white/[0.07] bg-white/[0.035] px-4 py-3 text-sm transition hover:bg-white/[0.065]'
 
 export function BrandMark({ href = '/', label = 'Halvex', className }: BrandMarkProps) {
   return (

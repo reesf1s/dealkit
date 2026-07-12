@@ -7,7 +7,7 @@ import { ensureCrmSeeded, getCrmWorkspacePayload, getDemoCrmWorkspaceState, getS
 
 export async function GET() {
   try {
-    if (process.env.NODE_ENV !== 'production' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
+    if (process.env.HALVEX_DEMO_MODE === '1' || (process.env.NODE_ENV !== 'production' && process.env.HALVEX_LOCAL_DATABASE !== '1')) {
       return NextResponse.json(getDemoCrmWorkspaceState(), {
         headers: { 'Cache-Control': 'no-store' },
       })

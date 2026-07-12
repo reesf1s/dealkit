@@ -463,20 +463,23 @@ function signalTone(text: string) {
 function PageHeader({ view }: { view: WorkspaceViewName }) {
   const copy = VIEW_COPY[view]
   return (
-    <section className={cn(pillSurfaceClass, 'grid gap-5 bg-[#101316] p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end')}>
+    <section className="grid gap-4 py-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
       <div>
-        <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">{copy.eyebrow}</Badge>
-        <h1 className="mt-4 font-title text-3xl font-semibold tracking-normal text-white md:text-4xl">{copy.title}</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">{copy.description}</p>
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-300">
+          <span className="size-1.5 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.8)]" />
+          {copy.eyebrow}
+        </div>
+        <h1 className="mt-2 font-title text-2xl font-semibold tracking-tight text-white md:text-[30px]">{copy.title}</h1>
+        <p className="mt-1.5 max-w-3xl text-sm leading-6 text-zinc-500">{copy.description}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button asChild className="rounded-full bg-white text-black hover:bg-zinc-200">
+        <Button asChild className="rounded-lg bg-violet-500 text-white shadow-[0_8px_24px_rgba(124,58,237,0.25)] hover:bg-violet-400">
           <Link href="/deals">
             Open deals
             <ArrowUpRight className="size-4" />
           </Link>
         </Button>
-        <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+        <Button asChild variant="outline" className="rounded-lg border-white/10 bg-white/[0.04] text-zinc-100 hover:bg-white/[0.08]">
           <Link href="/coach">
             AI actions
             <Bot className="size-4" />
@@ -489,18 +492,18 @@ function PageHeader({ view }: { view: WorkspaceViewName }) {
 
 function StatCard({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof Gauge }) {
   return (
-    <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-      <CardContent className="p-4">
+    <Card className={cn(pillSurfaceClass, 'group gap-0 bg-[#12111a]/90 py-0 transition-colors hover:border-violet-400/20')}>
+      <CardContent className="p-4.5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs text-zinc-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold tracking-normal text-white">{value}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-zinc-500">{label}</p>
+            <p className="mt-2 font-title text-2xl font-semibold tracking-tight text-white">{value}</p>
           </div>
-          <span className="grid size-10 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-blue-200">
+          <span className="grid size-9 place-items-center rounded-xl border border-violet-400/15 bg-violet-400/10 text-violet-300 transition-colors group-hover:bg-violet-400/15">
             <Icon className="size-4" />
           </span>
         </div>
-        <p className="mt-4 text-xs leading-5 text-zinc-500">{detail}</p>
+        <p className="mt-3 text-xs leading-5 text-zinc-500">{detail}</p>
       </CardContent>
     </Card>
   )
@@ -596,9 +599,91 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
   const metrics = useWorkspaceMetrics(workspace)
   const priorityDeals = [...workspace.leads].sort((a, b) => b.score - a.score).slice(0, 4)
   const recommendations = workspace.intelligence.recommendations.slice(0, 3)
+  const coverage = metrics.total ? Math.round((metrics.weighted / metrics.total) * 100) : 0
+  const maxStageValue = Math.max(...metrics.stages.map(stage => stage.value), 1)
 
   return (
     <div className="grid gap-4">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.7fr)]">
+        <Card className={cn(pillSurfaceClass, 'relative overflow-hidden bg-[linear-gradient(135deg,#171426_0%,#111018_64%,#12111a_100%)]')}>
+          <div className="pointer-events-none absolute -right-24 -top-32 size-80 rounded-full bg-violet-600/15 blur-3xl" />
+          <CardHeader className="relative border-b border-white/[0.06] pb-5 md:flex md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <CardTitle>Revenue forecast</CardTitle>
+                <Badge variant="outline" className="border-emerald-400/20 bg-emerald-400/10 text-[10px] text-emerald-300">Live</Badge>
+              </div>
+              <CardDescription className="mt-1">Probability-weighted view of every active opportunity.</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm" className="rounded-lg border-white/10 bg-white/[0.04] text-zinc-300">
+              <Link href="/forecast">View forecast <ArrowUpRight className="size-3.5" /></Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="relative grid gap-6 pt-1 md:grid-cols-[0.78fr_1.22fr] md:items-end">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Weighted pipeline</p>
+              <p className="mt-2 font-title text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">{money(Math.round(metrics.weighted))}</p>
+              <div className="mt-4 flex items-center gap-3 text-xs">
+                <span className="rounded-lg bg-violet-400/10 px-2.5 py-1.5 font-medium text-violet-300">{coverage}% confidence</span>
+                <span className="text-zinc-500">from {money(metrics.total)} open</span>
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <div className="flex h-2 overflow-hidden rounded-full bg-white/[0.05]">
+                {metrics.stages.map((stage, index) => (
+                  <span
+                    key={stage.stage}
+                    className={cn('h-full', index % 4 === 0 ? 'bg-violet-500' : index % 4 === 1 ? 'bg-fuchsia-500' : index % 4 === 2 ? 'bg-indigo-400' : 'bg-violet-300')}
+                    style={{ width: `${metrics.total ? Math.max(3, (stage.value / metrics.total) * 100) : 0}%` }}
+                  />
+                ))}
+              </div>
+              <div className="grid gap-2">
+                {metrics.stages.slice(0, 4).map(stage => (
+                  <div key={stage.stage} className="grid grid-cols-[88px_minmax(0,1fr)_auto] items-center gap-3 text-xs">
+                    <span className="truncate text-zinc-400">{stage.stage}</span>
+                    <span className="h-1 overflow-hidden rounded-full bg-white/[0.05]"><span className="block h-full rounded-full bg-violet-400/60" style={{ width: `${(stage.value / maxStageValue) * 100}%` }} /></span>
+                    <span className="font-medium text-zinc-300">{money(stage.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={cn(pillSurfaceClass, 'overflow-hidden border-violet-400/15 bg-[#151221]')}>
+          <CardHeader className="border-b border-white/[0.06]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="grid size-9 place-items-center rounded-xl bg-violet-500 text-white shadow-[0_8px_24px_rgba(124,58,237,0.28)]"><Bot className="size-4" /></span>
+                <div>
+                  <CardTitle>Halvex intelligence</CardTitle>
+                  <CardDescription className="mt-1">Your live revenue brief</CardDescription>
+                </div>
+              </div>
+              <span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {recommendations.slice(0, 2).map((item, index) => (
+              <div key={item.id} className={cn(pillInsetClass, 'group p-4 transition-colors hover:border-violet-400/20')}>
+                <div className="flex items-start gap-3">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-violet-400/10 text-[10px] font-semibold text-violet-300">0{index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-white">{item.title}</p>
+                    <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-zinc-500">{item.body}</p>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-medium text-emerald-300">{money(item.estimatedValue)} influenced</span>
+                      <Button asChild variant="ghost" size="sm" className="h-7 rounded-lg px-2 text-[11px] text-violet-300 hover:bg-violet-400/10 hover:text-violet-200"><Link href="/coach">Act now <ArrowUpRight className="size-3" /></Link></Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Open pipeline" value={money(metrics.total)} detail={`${workspace.leads.length} active deals across all channels.`} icon={TrendingUp} />
         <StatCard label="Weighted forecast" value={money(Math.round(metrics.weighted))} detail="Probability-adjusted value currently in play." icon={Gauge} />
@@ -606,68 +691,73 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
         <StatCard label="Live channels" value={`${metrics.connected}/${workspace.channels.length}`} detail={`${metrics.messageCount} captured messages feeding the workspace.`} icon={PlugZap} />
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-          <CardHeader>
-            <CardTitle>Priority deals</CardTitle>
-            <CardDescription>What should sit in the dashboard: the few deals that change the week.</CardDescription>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(340px,0.7fr)]">
+        <Card className={cn(pillSurfaceClass, 'bg-[#12111a]/90')}>
+          <CardHeader className="border-b border-white/[0.06] md:flex md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>Priority deals</CardTitle>
+              <CardDescription className="mt-1">Ranked by value, momentum, risk, and buying signals.</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm" className="rounded-lg border-white/10 bg-white/[0.04] text-zinc-300"><Link href="/deals">All deals <ArrowUpRight className="size-3.5" /></Link></Button>
           </CardHeader>
-          <CardContent className="grid gap-3">
-            {priorityDeals.map(lead => (
+          <CardContent className="grid gap-1 px-3">
+            <div className="hidden grid-cols-[minmax(0,1.4fr)_0.7fr_0.55fr_0.35fr] gap-3 px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600 md:grid">
+              <span>Opportunity</span><span>Stage</span><span>Value</span><span>Score</span>
+            </div>
+            {priorityDeals.map((lead, index) => (
               <button
                 key={lead.id}
                 type="button"
                 onClick={() => actions.selectLead(lead.id)}
-                className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center')}
+                className="grid gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-white/[0.045] md:grid-cols-[minmax(0,1.4fr)_0.7fr_0.55fr_0.35fr] md:items-center"
               >
-                <DealAvatar value={lead.companyName} />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{lead.companyName}</p>
-                  <p className="mt-1 truncate text-xs text-zinc-500">{lead.nextStep}</p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="w-4 text-[10px] text-zinc-600">{index + 1}</span>
+                  <DealAvatar value={lead.companyName} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{lead.companyName}</p>
+                    <p className="mt-1 truncate text-xs text-zinc-500">{lead.nextStep}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={riskTone(lead.risk)}>{lead.risk}</Badge>
-                  <span className="text-sm font-medium text-white">{money(Number(lead.valueAmount ?? 0))}</span>
-                </div>
+                <span className="text-xs text-zinc-400">{lead.stageName || lead.stage}</span>
+                <span className="text-sm font-medium text-white">{money(Number(lead.valueAmount ?? 0))}</span>
+                <span className="flex items-center gap-2 text-sm font-semibold text-violet-300"><span className={cn('size-1.5 rounded-full', lead.risk === 'hot' ? 'bg-red-400' : lead.risk === 'warm' ? 'bg-amber-300' : 'bg-emerald-400')} />{lead.score}</span>
               </button>
             ))}
           </CardContent>
         </Card>
 
-        <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
+        <Card className={cn(pillSurfaceClass, 'bg-[#12111a]/90')}>
           <CardHeader>
-            <CardTitle>Today’s operating queue</CardTitle>
-            <CardDescription>Compact, opinionated, and action-oriented.</CardDescription>
+            <CardTitle>Sales motion</CardTitle>
+            <CardDescription>One connected workflow from capture to close.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3">
-            {recommendations.map(item => (
-              <div key={item.id} className={cn(pillInsetClass, 'p-4')}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-white">{item.title}</p>
-                    <p className="mt-2 text-xs leading-5 text-zinc-500">{item.body}</p>
-                  </div>
-                  <Badge variant="outline" className="border-blue-300/20 bg-blue-300/10 text-blue-100">{money(item.estimatedValue)}</Badge>
-                </div>
-                <Button asChild variant="outline" size="sm" className="mt-4 rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
-                  <Link href="/coach">
-                    Open action
-                    <ArrowUpRight className="size-3.5" />
-                  </Link>
-                </Button>
-              </div>
-            ))}
+          <CardContent className="grid gap-2">
+            {[
+              { label: 'Capture', detail: `${metrics.connected} live sources`, href: '/channels', icon: PlugZap },
+              { label: 'Qualify', detail: `${workspace.leads.length} scored deals`, href: '/deals', icon: Gauge },
+              { label: 'Engage', detail: `${metrics.messageCount} conversations`, href: '/inbox', icon: MessageCircle },
+              { label: 'Execute', detail: `${metrics.tasks} open tasks`, href: '/tasks', icon: CheckCircle2 },
+              { label: 'Close', detail: `${coverage}% forecast confidence`, href: '/forecast', icon: TrendingUp },
+            ].map((step, index) => {
+              const Icon = step.icon
+              return <Link key={step.label} href={step.href} className="group flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 transition hover:border-white/[0.06] hover:bg-white/[0.035]">
+                <span className="grid size-8 place-items-center rounded-lg border border-violet-400/15 bg-violet-400/10 text-violet-300"><Icon className="size-3.5" /></span>
+                <span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-zinc-200">{step.label}</span><span className="mt-0.5 block text-[11px] text-zinc-600">{step.detail}</span></span>
+                <span className="text-[10px] text-zinc-700">0{index + 1}</span>
+              </Link>
+            })}
           </CardContent>
         </Card>
       </section>
 
-      <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
-        <CardHeader className="md:flex-row md:items-end md:justify-between">
+      <Card className={cn(pillSurfaceClass, 'bg-[#12111a]/90')}>
+        <CardHeader className="md:flex md:flex-row md:items-end md:justify-between">
           <div>
-            <CardTitle>Operating system</CardTitle>
-            <CardDescription>Supporting modules for data intake, call intelligence, automation, reporting, and workspace control.</CardDescription>
+            <CardTitle>Revenue operations</CardTitle>
+            <CardDescription>Data, automation, call intelligence, and governance in one CRM.</CardDescription>
           </div>
-          <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-zinc-100">
+          <Button asChild variant="outline" className="rounded-lg border-white/10 bg-white/[0.04] text-zinc-100">
             <Link href="/settings">
               Admin
               <ArrowUpRight className="size-3.5" />
@@ -678,9 +768,9 @@ function DashboardView({ workspace, actions }: { workspace: CrmWorkspacePayload;
           {OPERATING_TOOLS.map(tool => {
             const Icon = tool.icon
             return (
-              <Link key={tool.href} href={tool.href} className={cn(pillInsetClass, 'group grid gap-4 p-4 transition hover:bg-white/[0.07]')}>
+              <Link key={tool.href} href={tool.href} className={cn(pillInsetClass, 'group grid gap-4 p-4 transition hover:border-violet-400/20 hover:bg-violet-400/[0.04]')}>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="grid size-10 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-200">
+                  <span className="grid size-10 place-items-center rounded-xl border border-violet-400/15 bg-violet-400/10 text-violet-300">
                     <Icon className="size-4" />
                   </span>
                   <ArrowUpRight className="size-4 text-zinc-600 transition group-hover:text-zinc-200" />
@@ -2001,6 +2091,8 @@ function ActivityComposer({
 }
 
 function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; actions: WorkspaceAction }) {
+  const [busyActivityId, setBusyActivityId] = useState<string | null>(null)
+  const [activityNotice, setActivityNotice] = useState<string | null>(null)
   const meetingActivities = workspace.activities.filter(isMeetingActivity)
   const meetingMessages = workspace.messages.meetings
   const riskSignals = meetingActivities.filter(activity => signalTone(`${activity.title} ${activity.body}`) === 'border-red-400/25 bg-red-400/10 text-red-100')
@@ -2014,6 +2106,19 @@ function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
     .filter(lead => !meetingActivities.some(activity => activity.companyName === lead.companyName || activity.personName === lead.primaryPersonName))
     .sort((a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0))
     .slice(0, 4)
+
+  async function deleteActivity(activityId: string) {
+    if (!window.confirm('Delete this logged evidence? This removes it from the workspace activity feed.')) return
+    setBusyActivityId(activityId)
+    setActivityNotice(null)
+    try {
+      await apiJson(`/api/crm/activities/${activityId}`, { method: 'DELETE' })
+      setActivityNotice('Activity deleted')
+      await actions.refresh()
+    } finally {
+      setBusyActivityId(null)
+    }
+  }
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -2081,21 +2186,24 @@ function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
 
         <Card className={cn(pillSurfaceClass, 'bg-[#101316]')}>
           <CardHeader>
-            <CardTitle>Call intelligence feed</CardTitle>
-            <CardDescription>Meeting notes ranked as revenue evidence, tied directly back to the deal record.</CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle>Call intelligence feed</CardTitle>
+                <CardDescription>Meeting notes ranked as revenue evidence, tied directly back to the deal record.</CardDescription>
+              </div>
+              {activityNotice ? <Badge variant="outline" className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">{activityNotice}</Badge> : null}
+            </div>
           </CardHeader>
           <CardContent className="grid gap-3">
             {meetingActivities.map(activity => {
               const lead = activityLead(workspace, activity)
               const tone = signalTone(`${activity.title} ${activity.body}`)
               return (
-                <button
+                <div
                   key={activity.id}
-                  type="button"
-                  onClick={() => lead ? actions.selectLead(lead.id) : undefined}
-                  className={cn(pillInsetClass, 'grid gap-3 p-4 text-left transition hover:bg-white/[0.07] md:grid-cols-[minmax(0,1fr)_auto] md:items-start')}
+                  className={cn(pillInsetClass, 'grid gap-3 p-4 transition hover:bg-white/[0.04] md:grid-cols-[minmax(0,1fr)_auto] md:items-start')}
                 >
-                  <div className="min-w-0">
+                  <button type="button" onClick={() => lead ? actions.selectLead(lead.id) : undefined} className="min-w-0 text-left">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className={tone}>{activity.type ?? 'meeting'}</Badge>
                       <p className="font-medium text-white">{activity.title}</p>
@@ -2103,12 +2211,23 @@ function MeetingsView({ workspace, actions }: { workspace: CrmWorkspacePayload; 
                     <p className="mt-1 text-xs text-zinc-500">{activity.companyName ?? 'No account'} · {activity.personName ?? 'No contact'}</p>
                     <p className="mt-3 text-sm leading-6 text-zinc-300">{activity.body}</p>
                     {lead?.nextStep ? <p className="mt-3 text-xs text-zinc-500">Next: {lead.nextStep}</p> : null}
-                  </div>
-                  <div className="text-right text-xs text-zinc-500">
+                  </button>
+                  <div className="grid gap-3 text-left text-xs text-zinc-500 md:justify-items-end md:text-right">
                     <p>{shortDate(activity.occurredAt)}</p>
                     {lead ? <p className="mt-2 text-zinc-300">{money(Number(lead.valueAmount ?? 0))}</p> : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busyActivityId === activity.id}
+                      onClick={() => void deleteActivity(activity.id)}
+                      className="w-fit rounded-full border-red-300/20 bg-red-300/10 px-3 text-xs text-red-100 hover:bg-red-300/15"
+                    >
+                      <Trash2 className="size-3.5" />
+                      {busyActivityId === activity.id ? 'Deleting...' : 'Delete'}
+                    </Button>
                   </div>
-                </button>
+                </div>
               )
             })}
           </CardContent>

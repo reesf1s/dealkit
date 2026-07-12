@@ -70,7 +70,7 @@ export default async function LandingPage() {
               Halvex
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-200">
-              A polished sales workspace for SMEs that turns every conversation, deal signal, and AI-assisted next step into one rounded operating table.
+              A complete sales workspace for SMEs that turns every conversation, deal signal, and AI-assisted next step into a clear path to revenue.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg" className="rounded-full bg-white px-6 text-black hover:bg-zinc-200">
@@ -99,7 +99,7 @@ export default async function LandingPage() {
             Built as a system, not a pile of screens.
           </h2>
           <p className="mt-4 text-sm leading-7 text-zinc-400">
-            The core workspace is organized around pills, segmented choices, and tabular deal rows so teams can scan, compare, and act without wandering through card stacks.
+            Halvex connects pipeline, conversations, tasks, forecasts, and deal intelligence so every rep can see what matters and act without losing context.
           </p>
         </div>
 

@@ -5,10 +5,11 @@ import { usePathname } from 'next/navigation'
 import {
   BarChart3,
   Bot,
+  Building2,
   CalendarDays,
   CheckSquare,
+  ChevronDown,
   CreditCard,
-  Building2,
   FileSpreadsheet,
   Home,
   MessagesSquare,
@@ -24,11 +25,13 @@ import type { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { pillButtonClass } from '@/components/sme/halvex-system'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import WorkspaceCommandBar from '@/components/sme/WorkspaceCommandBar'
 import WorkspaceSignals from '@/components/sme/WorkspaceSignals'
 import { cn } from '@/lib/utils'
@@ -36,159 +39,152 @@ import { cn } from '@/lib/utils'
 type NavLink = {
   href: string
   label: string
-  icon: 'home' | 'conversations' | 'pipeline' | 'accounts' | 'tasks' | 'meetings' | 'call-review' | 'team' | 'forecast' | 'reports' | 'import' | 'automation' | 'coaching' | 'integrations' | 'settings' | 'billing'
+  icon: typeof Home
 }
 
 const navigation: NavLink[] = [
-  { href: '/home', label: 'Command', icon: 'home' },
-  { href: '/deals', label: 'Pipeline', icon: 'pipeline' },
-  { href: '/inbox', label: 'Conversations', icon: 'conversations' },
-  { href: '/forecast', label: 'Forecast', icon: 'forecast' },
-  { href: '/coach', label: 'Coach', icon: 'coaching' },
+  { href: '/home', label: 'Overview', icon: Home },
+  { href: '/deals', label: 'Deals', icon: TrendingUp },
+  { href: '/inbox', label: 'Inbox', icon: MessagesSquare },
+  { href: '/forecast', label: 'Forecast', icon: BarChart3 },
+  { href: '/coach', label: 'Intelligence', icon: Bot },
 ]
 
-const secondaryNavigation: NavLink[] = [
-  { href: '/settings', label: 'Settings', icon: 'settings' },
+const workspaceNavigation: NavLink[] = [
+  { href: '/accounts', label: 'Accounts', icon: Building2 },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { href: '/meetings', label: 'Meetings', icon: CalendarDays },
+  { href: '/team', label: 'Team', icon: Users },
+  { href: '/reports', label: 'Reports', icon: TrendingUp },
+  { href: '/automations', label: 'Automations', icon: Workflow },
+  { href: '/call-review', label: 'Call intelligence', icon: PhoneCall },
+  { href: '/import', label: 'Import data', icon: FileSpreadsheet },
+  { href: '/channels', label: 'Integrations', icon: PlugZap },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/settings/billing', label: 'Billing', icon: CreditCard },
 ]
 
-const utilityNavigation: NavLink[] = [
-  { href: '/accounts', label: 'Accounts', icon: 'accounts' },
-  { href: '/tasks', label: 'Tasks', icon: 'tasks' },
-  { href: '/meetings', label: 'Meetings', icon: 'meetings' },
-  { href: '/team', label: 'Team', icon: 'team' },
-  { href: '/reports', label: 'Reports', icon: 'reports' },
-  { href: '/import', label: 'Import', icon: 'import' },
-  { href: '/automations', label: 'Automations', icon: 'automation' },
-  { href: '/call-review', label: 'Call review', icon: 'call-review' },
-  { href: '/channels', label: 'Channels', icon: 'integrations' },
-  { href: '/settings/billing', label: 'Billing', icon: 'billing' },
-]
-
-function NavIcon({ icon }: { icon: NavLink['icon'] }) {
-  const props = { className: 'size-4', strokeWidth: 2 }
-  switch (icon) {
-    case 'home':
-      return <Home {...props} />
-    case 'conversations':
-      return <MessagesSquare {...props} />
-    case 'pipeline':
-      return <Users {...props} />
-    case 'accounts':
-      return <Building2 {...props} />
-    case 'tasks':
-      return <CheckSquare {...props} />
-    case 'meetings':
-      return <CalendarDays {...props} />
-    case 'call-review':
-      return <PhoneCall {...props} />
-    case 'team':
-      return <Users {...props} />
-    case 'forecast':
-      return <BarChart3 {...props} />
-    case 'reports':
-      return <TrendingUp {...props} />
-    case 'import':
-      return <FileSpreadsheet {...props} />
-    case 'automation':
-      return <Workflow {...props} />
-    case 'coaching':
-      return <Bot {...props} />
-    case 'integrations':
-      return <PlugZap {...props} />
-    case 'settings':
-      return <Settings {...props} />
-    case 'billing':
-      return <CreditCard {...props} />
-  }
+function isActive(pathname: string, href: string) {
+  return pathname === href || (href !== '/home' && pathname.startsWith(href))
 }
 
-function RailNavItem({ item }: { item: NavLink }) {
+function PrimaryNav({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname()
-  const active = pathname === item.href || (item.href !== '/home' && pathname?.startsWith(item.href))
-
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
+    <nav className={cn('flex items-center', mobile ? 'gap-1' : 'gap-0.5')} aria-label="Primary navigation">
+      {navigation.map(item => {
+        const active = isActive(pathname, item.href)
+        const Icon = item.icon
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'relative inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70',
+              active && 'bg-white/[0.08] text-white',
+            )}
+          >
+            <Icon className="size-3.5" />
+            {item.label}
+            {active ? <span className="absolute inset-x-3 -bottom-[15px] h-0.5 rounded-full bg-violet-400" /> : null}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
+
+function WorkspaceMenu() {
+  const pathname = usePathname()
+  const menuActive = workspaceNavigation.some(item => isActive(pathname, item.href))
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
-          asChild
           variant="ghost"
-          size="icon"
           className={cn(
-            'size-9 rounded-full border border-transparent text-zinc-500 hover:border-white/10 hover:bg-white/8 hover:text-zinc-100',
-            active && 'border-white/10 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+            'h-9 rounded-lg px-3 text-xs font-medium text-zinc-400 hover:bg-white/[0.06] hover:text-white',
+            menuActive && 'bg-white/[0.08] text-white',
           )}
         >
-          <Link href={item.href} aria-label={item.label} aria-current={active ? 'page' : undefined}>
-            <NavIcon icon={item.icon} />
-          </Link>
+          More
+          <ChevronDown className="size-3.5" />
         </Button>
-      </TooltipTrigger>
-      <TooltipContent side="right">{item.label}</TooltipContent>
-    </Tooltip>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72 rounded-2xl border-white/10 bg-[#11101a]/98 p-2 text-zinc-100 shadow-2xl backdrop-blur-xl">
+        <DropdownMenuLabel className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">Workspace</DropdownMenuLabel>
+        <div className="grid grid-cols-2 gap-1">
+          {workspaceNavigation.slice(0, 9).map(item => {
+            const Icon = item.icon
+            return (
+              <DropdownMenuItem key={item.href} asChild className="rounded-xl p-0 focus:bg-white/[0.07] focus:text-white">
+                <Link href={item.href} className="flex min-h-14 items-center gap-2.5 px-3 py-2">
+                  <span className="grid size-8 place-items-center rounded-lg border border-white/8 bg-white/[0.05] text-violet-300"><Icon className="size-3.5" /></span>
+                  <span className="text-xs font-medium">{item.label}</span>
+                </Link>
+              </DropdownMenuItem>
+            )
+          })}
+        </div>
+        <DropdownMenuSeparator className="my-2 bg-white/8" />
+        {workspaceNavigation.slice(9).map(item => {
+          const Icon = item.icon
+          return (
+            <DropdownMenuItem key={item.href} asChild className="rounded-xl focus:bg-white/[0.07] focus:text-white">
+              <Link href={item.href} className="gap-3 px-3 py-2.5 text-xs"><Icon className="size-4 text-zinc-500" />{item.label}</Link>
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
 export default function SmeDashboardShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
-  const allNavigation = [...navigation, ...secondaryNavigation, ...utilityNavigation]
-  const currentLabel = allNavigation.find(item => item.href === pathname)?.label ?? 'Workspace'
-
   return (
-    <div className="min-h-screen overflow-hidden bg-[#080a0d] text-zinc-100">
-      <div className="flex h-screen min-h-screen w-full overflow-hidden bg-[#050607]">
-        <aside className="hidden w-16 shrink-0 flex-col items-center border-r border-white/8 bg-black py-4 md:flex">
-          <Link
-            href="/home"
-            className="grid size-9 place-items-center rounded-full border border-white/10 bg-white text-sm font-black text-black shadow-[0_8px_28px_rgba(255,255,255,0.08)]"
-            aria-label="Halvex home"
-          >
-            H
+    <div className="min-h-screen bg-[#090811] text-zinc-100">
+      <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#090811]/90 backdrop-blur-2xl">
+        <div className="mx-auto flex h-16 max-w-[1680px] items-center gap-3 px-3 sm:px-5 lg:gap-5">
+          <Link href="/home" className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70" aria-label="Halvex overview">
+            <span className="relative grid size-9 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-violet-500 via-violet-600 to-fuchsia-700 text-sm font-black text-white shadow-[0_10px_35px_rgba(139,92,246,0.3)]">
+              H
+              <span className="absolute inset-x-1 top-0 h-px bg-white/60" />
+            </span>
+            <span className="hidden xl:block">
+              <span className="block font-title text-sm font-semibold leading-none text-white">Halvex</span>
+              <span className="mt-1 block text-[9px] font-medium uppercase tracking-[0.18em] text-violet-300">Revenue OS</span>
+            </span>
           </Link>
 
-          <nav className="mt-8 flex flex-1 flex-col items-center gap-2" aria-label="Main navigation">
-            {navigation.map(item => (
-              <RailNavItem key={item.label} item={item} />
-            ))}
-          </nav>
+          <div className="hidden items-center lg:flex">
+            <PrimaryNav />
+            <WorkspaceMenu />
+          </div>
 
-          <nav className="flex flex-col items-center gap-2" aria-label="Workspace navigation">
-            {secondaryNavigation.map(item => (
-              <RailNavItem key={item.label} item={item} />
-            ))}
-          </nav>
-        </aside>
-
-        <div className="flex min-w-0 flex-1 flex-col bg-[#090b0d]">
-          <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b border-white/8 bg-[#050607]/96 px-3 backdrop-blur-xl sm:gap-3 sm:px-4">
-            <Link href="/home" className="flex items-center gap-2 md:hidden">
-              <span className="grid size-9 place-items-center rounded-full bg-white text-sm font-black text-black">H</span>
-            </Link>
-
-            <Button
-              variant="ghost"
-              className={cn('hidden h-10 px-4 text-xs font-medium md:inline-flex', pillButtonClass)}
-              asChild
-            >
-              <Link href={pathname || '/home'}>
-                {currentLabel}
-                <TrendingUp className="size-3.5" />
-              </Link>
-            </Button>
-
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 lg:max-w-[520px]">
             <WorkspaceCommandBar />
-
             <WorkspaceSignals />
-
-            <div className="grid size-9 place-items-center rounded-full border border-white/10 bg-white/8">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] shadow-inner">
               <UserButton />
             </div>
-          </header>
-
-          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#0b0d0f] p-3 sm:p-4 lg:p-5">
-            {children}
-          </main>
+          </div>
         </div>
-      </div>
+
+        <div className="overflow-x-auto border-t border-white/[0.05] px-3 py-2 lg:hidden">
+          <div className="flex min-w-max items-center gap-1">
+            <PrimaryNav mobile />
+            <WorkspaceMenu />
+          </div>
+        </div>
+      </header>
+
+      <main className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-[radial-gradient(circle_at_10%_0%,rgba(124,58,237,0.11),transparent_30%),radial-gradient(circle_at_90%_20%,rgba(192,38,211,0.06),transparent_24%)]">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(rgba(255,255,255,.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.5)_1px,transparent_1px)] [background-size:48px_48px]" />
+        <div className="relative mx-auto w-full max-w-[1680px] p-3 sm:p-5 lg:p-6">
+          {children}
+        </div>
+      </main>
     </div>
   )
 }

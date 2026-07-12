@@ -713,6 +713,15 @@ export async function createCrmActivity(input: { workspaceId: string; data: Acti
   return activityToRecovery(activity)
 }
 
+export async function deleteCrmActivity(input: { workspaceId: string; activityId: string }) {
+  const [activity] = await db
+    .delete(crmActivities)
+    .where(and(eq(crmActivities.id, input.activityId), eq(crmActivities.workspaceId, input.workspaceId)))
+    .returning()
+
+  return activity ? activityToRecovery(activity) : null
+}
+
 export async function createCrmMessage(input: { workspaceId: string; leadId: string; channel: ChannelId; from: CrmMessageDto['from']; text: string }) {
   const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, input.leadId)).limit(1)
   if (!lead || lead.workspaceId !== input.workspaceId) return null
@@ -945,6 +954,16 @@ export function addDemoCrmActivity(input: ActivityMutationInput) {
       candidate.id === lead.id ? { ...candidate, latestActivityAt: activity.occurredAt } : candidate
     ))
   }
+  refreshDemoWorkspace(workspace)
+  return activity
+}
+
+export function deleteDemoCrmActivity(activityId: string) {
+  const workspace = getDemoCrmWorkspaceState()
+  const activity = workspace.activities.find(candidate => candidate.id === activityId)
+  if (!activity) return null
+
+  workspace.activities = workspace.activities.filter(candidate => candidate.id !== activityId)
   refreshDemoWorkspace(workspace)
   return activity
 }
