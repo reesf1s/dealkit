@@ -35,8 +35,8 @@ import {
 } from "@/components/sme/workspace/workspace-format";
 
 export const surface =
-  "rounded-xl border border-white/[0.08] bg-[#111019]/90 shadow-sm";
-export const inset = "rounded-lg border border-white/[0.07] bg-black/20";
+  "rounded-lg border border-white/[0.075] bg-[#0e131d] shadow-[0_12px_36px_rgba(0,0,0,0.12)]";
+export const inset = "rounded-md border border-white/[0.07] bg-black/20";
 
 export function ScreenHeader({
   eyebrow,
@@ -52,11 +52,13 @@ export function ScreenHeader({
   return (
     <header className="flex flex-col gap-4 py-1 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-xs font-medium text-violet-300">{eyebrow}</p>
-        <h1 className="mt-1.5 font-title text-2xl font-semibold tracking-tight text-white md:text-[28px]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-400">
+          {eyebrow}
+        </p>
+        <h1 className="mt-2 font-title text-2xl font-semibold tracking-tight text-white md:text-[30px]">
           {title}
         </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">
+        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
           {description}
         </p>
       </div>
@@ -76,14 +78,14 @@ export function Metric({
 }) {
   return (
     <div className="min-w-0 px-4 py-3 first:pl-0 last:pr-0">
-      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-600">
+      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-600">
         {label}
       </p>
       <p className="mt-1 font-title text-xl font-semibold text-white">
         {value}
       </p>
       {detail ? (
-        <p className="mt-1 truncate text-xs text-zinc-500">{detail}</p>
+        <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
       ) : null}
     </div>
   );

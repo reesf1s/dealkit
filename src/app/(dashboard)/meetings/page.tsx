@@ -1,7 +1,5 @@
-import WorkspaceView from '@/components/sme/WorkspaceView'
-
-export const dynamic = 'force-dynamic'
+import { redirect } from "next/navigation";
 
 export default function MeetingsPage() {
-  return <WorkspaceView view="meetings" />
+  redirect("/call-review");
 }

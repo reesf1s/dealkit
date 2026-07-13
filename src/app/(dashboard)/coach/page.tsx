@@ -1,7 +1,5 @@
-import WorkspaceView from '@/components/sme/WorkspaceView'
-
-export const dynamic = 'force-dynamic'
+import { redirect } from "next/navigation";
 
 export default function CoachPage() {
-  return <WorkspaceView view="coach" />
+  redirect("/home");
 }

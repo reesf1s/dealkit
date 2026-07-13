@@ -42,17 +42,6 @@ export function messagesForLead(
   return allMessages(workspace).filter((message) => message.leadId === leadId);
 }
 
-export function findLeadForRecord(
-  workspace: CrmWorkspacePayload,
-  record: { companyName?: string | null; personName?: string | null },
-) {
-  return workspace.leads.find(
-    (lead) =>
-      lead.companyName === record.companyName ||
-      lead.primaryPersonName === record.personName,
-  );
-}
-
 export function totalValue(leads: CrmLeadDto[]) {
   return leads.reduce((sum, lead) => sum + Number(lead.valueAmount ?? 0), 0);
 }

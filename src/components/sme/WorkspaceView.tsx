@@ -11,47 +11,18 @@ import {
   WorkspaceLoading,
 } from "@/components/sme/workspace/workspace-ui";
 import {
-  AccountsScreen,
   DealsScreen,
   HomeScreen,
   InboxScreen,
-  TasksScreen,
   type ScreenProps,
 } from "@/components/sme/workspace/core-screens";
-import {
-  ChannelsScreen,
-  CoachScreen,
-  ForecastScreen,
-  MeetingsScreen,
-  ReportsScreen,
-  TeamScreen,
-} from "@/components/sme/workspace/insight-screens";
 
-export type WorkspaceViewName =
-  | "dashboard"
-  | "inbox"
-  | "deals"
-  | "accounts"
-  | "tasks"
-  | "meetings"
-  | "team"
-  | "forecast"
-  | "reports"
-  | "coach"
-  | "channels";
+export type WorkspaceViewName = "dashboard" | "inbox" | "deals";
 
 const screens: Record<WorkspaceViewName, (props: ScreenProps) => ReactNode> = {
   dashboard: HomeScreen,
   deals: DealsScreen,
   inbox: InboxScreen,
-  tasks: TasksScreen,
-  accounts: AccountsScreen,
-  meetings: MeetingsScreen,
-  forecast: ForecastScreen,
-  coach: CoachScreen,
-  reports: ReportsScreen,
-  team: TeamScreen,
-  channels: ChannelsScreen,
 };
 
 export default function WorkspaceView({ view }: { view: WorkspaceViewName }) {

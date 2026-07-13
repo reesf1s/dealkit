@@ -1,7 +1,7 @@
-import WorkspaceSettings from '@/components/sme/WorkspaceSettings'
+import WorkspaceSettings from "@/components/sme/WorkspaceSettings";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export default function SettingsPage() {
-  return <WorkspaceSettings />
+  return <WorkspaceSettings />;
 }

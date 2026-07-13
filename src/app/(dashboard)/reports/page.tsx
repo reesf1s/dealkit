@@ -1,7 +1,5 @@
-import WorkspaceView from '@/components/sme/WorkspaceView'
-
-export const dynamic = 'force-dynamic'
+import { redirect } from "next/navigation";
 
 export default function ReportsPage() {
-  return <WorkspaceView view="reports" />
+  redirect("/deals");
 }

@@ -1,7 +1,7 @@
-import WorkspaceView from '@/components/sme/WorkspaceView'
+import WorkspaceView from "@/components/sme/WorkspaceView";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export default function DealsPage() {
-  return <WorkspaceView view="deals" />
+  return <WorkspaceView view="deals" />;
 }

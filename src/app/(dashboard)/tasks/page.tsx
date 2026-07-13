@@ -1,7 +1,5 @@
-import WorkspaceView from '@/components/sme/WorkspaceView'
-
-export const dynamic = 'force-dynamic'
+import { redirect } from "next/navigation";
 
 export default function TasksPage() {
-  return <WorkspaceView view="tasks" />
+  redirect("/home");
 }

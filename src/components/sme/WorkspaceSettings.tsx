@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Bot,
   CreditCard,
   Download,
   FileJson,
-  PlugZap,
   RefreshCw,
   ShieldCheck,
   Upload,
@@ -92,18 +90,6 @@ export default function WorkspaceSettings() {
 
   const settings = [
     {
-      href: "/channels",
-      label: "Channels",
-      detail: `${workspace.channels.filter((channel) => channel.connected).length}/${workspace.channels.length} connected`,
-      icon: PlugZap,
-    },
-    {
-      href: "/automations",
-      label: "Automations",
-      detail: "Follow-up and risk workflows",
-      icon: Bot,
-    },
-    {
       href: "/import",
       label: "Import data",
       detail: "Bring in a spreadsheet",
@@ -122,7 +108,7 @@ export default function WorkspaceSettings() {
       <ScreenHeader
         eyebrow="Workspace"
         title="Settings"
-        description="Manage the few controls that affect your CRM. Operational reporting stays in Reports."
+        description="Manage data, integrations, security, and billing without adding admin overhead."
         action={
           <div className="flex gap-2">
             <Button
@@ -172,6 +158,33 @@ export default function WorkspaceSettings() {
             </Link>
           );
         })}
+      </section>
+
+      <section className={cn(surface, "p-5")}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-white">Connected sources</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Email, web chat, LinkedIn, and calls feed the same deal timeline.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {workspace.channels.map((channel) => (
+              <Badge
+                key={channel.id}
+                variant="outline"
+                className={cn(
+                  "rounded-md",
+                  channel.connected
+                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+                    : "border-white/10 bg-white/[0.03] text-slate-500",
+                )}
+              >
+                {channel.name} · {channel.connected ? "connected" : "off"}
+              </Badge>
+            ))}
+          </div>
+        </div>
       </section>
 
       <details className={cn(surface, "group p-4")}>

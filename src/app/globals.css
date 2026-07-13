@@ -73,9 +73,15 @@
 }
 
 @theme inline {
-  --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-title: var(--font-body), "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "Source Code Pro", "Source Code Pro Fallback", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-sans:
+    "Inter", "Inter Fallback", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-title:
+    var(--font-body), "Inter", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:
+    "Source Code Pro", "Source Code Pro Fallback", ui-monospace, SFMono-Regular,
+    Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -120,14 +126,22 @@
 
   html {
     min-height: 100%;
-    background: #090811;
+    background: #080b12;
   }
 
   body {
     min-height: 100vh;
-    background: #090811;
+    background: #080b12;
     color: var(--foreground);
-    font-family: var(--font-body), "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family:
+      var(--font-body),
+      "Inter",
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
   }
 
   h1,
@@ -135,7 +149,15 @@
   h3,
   [data-slot="card-title"],
   .font-title {
-    font-family: var(--font-title), "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family:
+      var(--font-title),
+      "Inter",
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
     letter-spacing: -0.02em;
   }
 

@@ -1,15 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  ArrowUpRight,
-  Bot,
-  Check,
-  Clock3,
-  Search,
-  Send,
-  Sparkles,
-} from "lucide-react";
+import { useState } from "react";
+import { ArrowUpRight, Check, Search, Send, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +22,6 @@ import {
   surface,
 } from "@/components/sme/workspace/workspace-ui";
 import {
-  findLeadForRecord,
   messagesForLead,
   money,
   shortDate,
@@ -88,6 +79,7 @@ export function HomeScreen({
   workspace,
   intelligence,
   onSelectLead,
+  refresh,
 }: ScreenProps) {
   const [now] = useState(() => Date.now());
   const openLeads = workspace.leads.filter(
@@ -104,7 +96,18 @@ export function HomeScreen({
   );
   const dueTasks = workspace.tasks.filter(
     (task) => task.dueAt && new Date(task.dueAt).getTime() <= now + 86_400_000,
-  ).length;
+  );
+  const [busyTask, setBusyTask] = useState<string | null>(null);
+
+  async function completeTask(taskId: string) {
+    setBusyTask(taskId);
+    try {
+      await crmRequest(`/api/crm/tasks/${taskId}`, { method: "DELETE" });
+      await refresh();
+    } finally {
+      setBusyTask(null);
+    }
+  }
 
   return (
     <div className="grid gap-5">
@@ -126,7 +129,7 @@ export function HomeScreen({
         />
         <Metric
           label="Due today"
-          value={`${dueTasks}`}
+          value={`${dueTasks.length}`}
           detail="Tasks to clear"
         />
       </MetricsBar>
@@ -142,7 +145,7 @@ export function HomeScreen({
                   and your own outcomes.
                 </p>
               </div>
-              <Sparkles className="size-4 text-violet-300" />
+              <Sparkles className="size-4 text-violet-400" />
             </div>
           </CardHeader>
           <CardContent className="divide-y divide-white/[0.06] p-2">
@@ -159,48 +162,41 @@ export function HomeScreen({
 
         <Card className={cn(surface, "gap-0 py-0")}>
           <CardHeader className="border-b border-white/[0.07] px-5 py-4">
-            <div className="flex items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-lg bg-violet-500 text-white">
-                <Bot className="size-4" />
-              </span>
-              <div>
-                <CardTitle className="text-base">How Halvex helps</CardTitle>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Intelligence inside the CRM, not another dashboard.
-                </p>
-              </div>
+            <div>
+              <CardTitle className="text-base">Today&apos;s tasks</CardTitle>
+              <p className="mt-1 text-xs text-zinc-500">Only work due now.</p>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 p-5 text-sm">
-            {[
-              [
-                "1",
-                "Predict",
-                "A workspace-trained model ranks win likelihood and risk.",
-              ],
-              [
-                "2",
-                "Explain",
-                "An LLM reads the evidence and explains the next move.",
-              ],
-              [
-                "3",
-                "Act",
-                "Create the task, draft the reply, or update the deal in place.",
-              ],
-            ].map((item) => (
-              <div key={item[0]} className="flex gap-3">
-                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-violet-400/10 text-xs font-semibold text-violet-300">
-                  {item[0]}
-                </span>
-                <div>
-                  <p className="font-medium text-zinc-200">{item[1]}</p>
-                  <p className="mt-1 text-xs leading-5 text-zinc-500">
-                    {item[2]}
+          <CardContent className="divide-y divide-white/[0.06] p-2">
+            {dueTasks.slice(0, 5).map((task) => (
+              <div
+                key={task.id}
+                className="flex items-start gap-3 rounded-md px-2 py-3"
+              >
+                <button
+                  type="button"
+                  aria-label={`Complete ${task.title}`}
+                  disabled={busyTask === task.id}
+                  onClick={() => void completeTask(task.id)}
+                  className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-white/10 text-slate-600 transition hover:border-emerald-400/40 hover:text-emerald-300"
+                >
+                  <Check className="size-3.5" />
+                </button>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-200">
+                    {task.title}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-slate-600">
+                    {task.companyName ?? "General"}
                   </p>
                 </div>
               </div>
             ))}
+            {!dueTasks.length ? (
+              <p className="px-3 py-8 text-center text-xs text-slate-600">
+                No tasks due. Work the ranked actions.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </section>
@@ -542,182 +538,6 @@ export function InboxScreen({ workspace, onSelectLead, refresh }: ScreenProps) {
             </p>
           )}
         </div>
-      </section>
-    </div>
-  );
-}
-
-export function TasksScreen({ workspace, onSelectLead, refresh }: ScreenProps) {
-  const [now] = useState(() => Date.now());
-  const [scope, setScope] = useState<"today" | "all">("today");
-  const rows = workspace.tasks
-    .filter(
-      (task) =>
-        scope === "all" ||
-        !task.dueAt ||
-        new Date(task.dueAt).getTime() <= now + 86_400_000,
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.dueAt ?? 0).getTime() - new Date(b.dueAt ?? 0).getTime(),
-    );
-  const [busy, setBusy] = useState<string | null>(null);
-
-  async function complete(taskId: string) {
-    setBusy(taskId);
-    try {
-      await crmRequest(`/api/crm/tasks/${taskId}`, { method: "DELETE" });
-      await refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <div className="grid gap-5">
-      <ScreenHeader
-        eyebrow="Execution"
-        title="Tasks"
-        description="A short, revenue-linked list. Complete the work and the queue gets out of your way."
-        action={
-          <div className="flex gap-1 rounded-lg border border-white/[0.07] bg-black/20 p-1">
-            {(["today", "all"] as const).map((value) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setScope(value)}
-                className={cn(
-                  "h-7 px-3 capitalize text-zinc-500",
-                  scope === value && "bg-white/[0.08] text-white",
-                )}
-              >
-                {value}
-              </Button>
-            ))}
-          </div>
-        }
-      />
-      <Card className={cn(surface, "gap-0 py-0")}>
-        <CardContent className="divide-y divide-white/[0.06] p-2">
-          {rows.map((task) => {
-            const lead = findLeadForRecord(workspace, task);
-            return (
-              <div
-                key={task.id}
-                className="grid gap-3 rounded-lg px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
-              >
-                <button
-                  type="button"
-                  onClick={() => void complete(task.id)}
-                  disabled={busy === task.id}
-                  className="grid size-8 place-items-center rounded-full border border-white/10 text-zinc-600 transition hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-300"
-                  aria-label={`Complete ${task.title}`}
-                >
-                  <Check className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => lead && onSelectLead(lead.id)}
-                  className="min-w-0 text-left"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-sm font-medium text-white">
-                      {task.title}
-                    </p>
-                    {task.priority === "high" ? (
-                      <Badge
-                        variant="outline"
-                        className="border-red-400/20 bg-red-400/10 text-red-200"
-                      >
-                        high
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 truncate text-xs text-zinc-500">
-                    {task.companyName ?? "No deal"} · {task.description}
-                  </p>
-                </button>
-                <div className="flex items-center gap-2 text-xs text-zinc-500">
-                  <Clock3 className="size-3.5" />
-                  {shortDate(task.dueAt)}
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-        {!rows.length ? (
-          <p className="p-10 text-center text-sm text-zinc-500">
-            You are clear. No tasks in this view.
-          </p>
-        ) : null}
-      </Card>
-    </div>
-  );
-}
-
-export function AccountsScreen({
-  workspace,
-  intelligence,
-  onSelectLead,
-}: ScreenProps) {
-  const accounts = useMemo(
-    () =>
-      [...workspace.leads].sort(
-        (a, b) => Number(b.valueAmount ?? 0) - Number(a.valueAmount ?? 0),
-      ),
-    [workspace.leads],
-  );
-  return (
-    <div className="grid gap-5">
-      <ScreenHeader
-        eyebrow="Relationships"
-        title="Accounts"
-        description="Every company, buyer, open value and next move—without a separate company database to maintain."
-      />
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {accounts.map((lead) => (
-          <button
-            key={lead.id}
-            type="button"
-            onClick={() => onSelectLead(lead.id)}
-            className={cn(
-              surface,
-              "p-4 text-left transition hover:border-violet-400/20 hover:bg-violet-400/[0.03]",
-            )}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <DealAvatar lead={lead} />
-                <div>
-                  <p className="font-semibold text-white">{lead.companyName}</p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {lead.primaryPersonName}
-                  </p>
-                </div>
-              </div>
-              <PredictionBadge prediction={intelligence.predictions[lead.id]} />
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-zinc-600">Open value</p>
-                <p className="mt-1 font-medium text-zinc-200">
-                  {money(Number(lead.valueAmount ?? 0))}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-600">Owner</p>
-                <p className="mt-1 truncate font-medium text-zinc-200">
-                  {lead.owner}
-                </p>
-              </div>
-            </div>
-            <p className="mt-4 truncate border-t border-white/[0.07] pt-3 text-xs text-zinc-500">
-              {intelligence.predictions[lead.id].nextAction.title}
-            </p>
-          </button>
-        ))}
       </section>
     </div>
   );

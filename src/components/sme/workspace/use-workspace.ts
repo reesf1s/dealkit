@@ -43,6 +43,10 @@ export function useWorkspace() {
 
   useEffect(() => {
     void refresh();
+    const handleRefresh = () => void refresh();
+    window.addEventListener("halvex:workspace-refresh", handleRefresh);
+    return () =>
+      window.removeEventListener("halvex:workspace-refresh", handleRefresh);
   }, [refresh]);
 
   return { workspace, loading, error, refresh };

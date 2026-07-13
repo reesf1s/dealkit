@@ -1,7 +1,7 @@
-import WorkspaceView from '@/components/sme/WorkspaceView'
+import WorkspaceView from "@/components/sme/WorkspaceView";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export default function InboxPage() {
-  return <WorkspaceView view="inbox" />
+  return <WorkspaceView view="inbox" />;
 }

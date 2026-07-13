@@ -1,7 +1,5 @@
-import WorkspaceAutomations from '@/components/sme/WorkspaceAutomations'
-
-export const dynamic = 'force-dynamic'
+import { redirect } from "next/navigation";
 
 export default function AutomationsPage() {
-  return <WorkspaceAutomations />
+  redirect("/settings");
 }
