@@ -77,7 +77,7 @@ export async function getWorkspaceContext(userId: string, userEmail?: string): P
   if (!row) {
     await db.insert(users).values({
       id: userId,
-      email: userEmail ?? `${userId}@clerk.placeholder`,
+      email: userEmail ?? `${userId}@local.halvex`,
       createdAt: new Date(),
       updatedAt: new Date(),
     }).onConflictDoNothing()

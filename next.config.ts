@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from '@sentry/nextjs'
 
+process.env.NEXT_PUBLIC_CLERK_UNSAFE_DISABLE_DEVELOPMENT_MODE_CONSOLE_WARNING ??= 'true'
+
 // Derive Supabase hostname from env so connect-src covers the project URL.
 // Falls back to a wildcard supabase.co pattern when the var is absent (e.g. CI).
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
@@ -12,10 +14,32 @@ try {
   }
 } catch { /* ignore malformed URL */ }
 
+function clerkOrigin(value?: string) {
+  if (!value) return ''
+  try {
+    return new URL(value.startsWith('http') ? value : `https://${value}`).origin
+  } catch {
+    return ''
+  }
+}
+
+const clerkCustomOrigin = clerkOrigin(process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || process.env.NEXT_PUBLIC_CLERK_DOMAIN)
+const clerkHosts = [
+  clerkCustomOrigin,
+  'https://clerk.halvex.ai',
+  'https://clerk.accounts.dev',
+  'https://*.clerk.accounts.dev',
+].filter(Boolean).join(' ')
+const clerkSocketHosts = [
+  clerkCustomOrigin.replace(/^https:/, 'wss:'),
+  'wss://clerk.halvex.ai',
+  'wss://ws.clerk.accounts.dev',
+].filter(Boolean).join(' ')
+
 const csp = [
   "default-src 'self'",
   // Scripts: self + Clerk (uses eval for its own UI) + Mixpanel analytics + Stripe + Vercel insights
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.halvex.ai https://clerk.accounts.dev https://*.clerk.accounts.dev https://cdn.mxpnl.com https://js.stripe.com https://*.vercel-insights.com",
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${clerkHosts} https://cdn.mxpnl.com https://js.stripe.com https://*.vercel-insights.com`,
   // Styles: self + inline (needed for CSS-in-JS / Tailwind) + Google Fonts
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Images: self + data URIs + any HTTPS (avatars, logos)
@@ -23,9 +47,9 @@ const csp = [
   // Fonts: self + data URIs + Google Fonts CDN
   "font-src 'self' data: https://fonts.gstatic.com",
   // Connections: self + Supabase + Clerk (custom domain + accounts) + Stripe + Vercel analytics
-  `connect-src 'self' ${supabaseHosts} https://*.supabase.co wss://*.supabase.co https://clerk.halvex.ai https://clerk.accounts.dev https://*.clerk.accounts.dev wss://ws.clerk.accounts.dev https://api.stripe.com https://vitals.vercel-insights.com https://*.vercel-insights.com`,
+  `connect-src 'self' ${supabaseHosts} https://*.supabase.co wss://*.supabase.co ${clerkHosts} ${clerkSocketHosts} https://clerk-telemetry.com https://api.stripe.com https://vitals.vercel-insights.com https://*.vercel-insights.com`,
   // Frames: Clerk hosted pages only
-  "frame-src https://accounts.clerk.dev https://*.clerk.accounts.dev https://clerk.halvex.ai https://js.stripe.com",
+  `frame-src https://accounts.clerk.dev ${clerkHosts} https://js.stripe.com`,
   // Workers: self
   "worker-src 'self' blob:",
 ].join('; ')

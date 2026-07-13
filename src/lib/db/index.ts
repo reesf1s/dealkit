@@ -1,34 +1,43 @@
-import { drizzle } from 'drizzle-orm/postgres-js'
-import postgres from 'postgres'
-import * as schema from './schema'
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
 
-// Use a dummy URL if DATABASE_URL is not set — postgres is lazy and won't
-// actually connect until a query is executed, so this prevents a crash at
-// module load time. API routes catch the resulting query error and return 503.
-const connectionString = (process.env.DATABASE_URL ?? 'postgresql://placeholder:placeholder@placeholder/placeholder').trim()
+type Database = ReturnType<typeof drizzle<typeof schema>>;
 
-const isSupabase = connectionString.includes('supabase.co') || connectionString.includes('pooler.supabase.com')
-// Supabase pgBouncer pooler (port 6543) doesn't support prepared statements
-const isPooler = connectionString.includes('pooler.supabase.com') || connectionString.includes(':6543/')
+let database: Database | null = null;
 
-const client = postgres(connectionString, {
-  // Serverless: pool size balanced for concurrency vs connection limits.
-  // pgBouncer (pooler) multiplexes to Postgres — 5 app connections is fine.
-  // Direct connections count against Supabase's limit — 10 is safe on pro.
-  max: isPooler ? 5 : 10,
-  idle_timeout: 20,
-  connect_timeout: 10,
-  // Kill runaway queries after 55 seconds — prevents connection starvation
-  // (55s to stay within Vercel's 60s serverless function limit)
-  connection: {
-    statement_timeout: 55000,
-  },
-  ssl: isSupabase ? 'require' : false,
-  // pgBouncer in transaction mode doesn't support prepared statements
-  prepare: !isPooler,
-})
-export const db = drizzle(client, { schema })
+function getDb(): Database {
+  if (database) return database;
 
-export function isDatabaseConfigured(): boolean {
-  return !!process.env.DATABASE_URL
+  const connectionString = process.env.DATABASE_URL?.trim();
+  if (!connectionString)
+    throw new Error("Missing environment variable: DATABASE_URL");
+
+  const isSupabase =
+    connectionString.includes("supabase.co") ||
+    connectionString.includes("pooler.supabase.com");
+  const isPooler =
+    connectionString.includes("pooler.supabase.com") ||
+    connectionString.includes(":6543/");
+  const client = postgres(connectionString, {
+    max: isPooler ? 5 : 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    connection: { statement_timeout: 55000 },
+    ssl: isSupabase ? "require" : false,
+    prepare: !isPooler,
+  });
+
+  database = drizzle(client, { schema });
+  return database;
 }
+
+// Keep existing call sites concise while delaying all environment reads and SDK
+// construction until the first real query at runtime.
+export const db = new Proxy({} as Database, {
+  get(_target, property) {
+    const instance = getDb();
+    const value = Reflect.get(instance, property, instance);
+    return typeof value === "function" ? value.bind(instance) : value;
+  },
+});

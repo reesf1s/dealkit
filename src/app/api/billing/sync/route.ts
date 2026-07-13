@@ -13,6 +13,10 @@ import type { Plan } from '@/types'
 // Useful when webhooks may have been missed or delayed
 export async function POST() {
   try {
+  if (process.env.NODE_ENV === 'development' && process.env.HALVEX_LOCAL_DATABASE !== '1') {
+    return NextResponse.json({ plan: 'free', fromPlan: 'free', synced: false, reason: 'local_demo' })
+  }
+
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

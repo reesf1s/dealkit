@@ -1,23 +1,19 @@
 # Contributing to Halvex
 
-## Migration workflow
+## Schema changes
 
-**`supabase/migrations/` is the source of truth for all schema changes.**
+The live application schema is represented in two places:
 
-There are two parallel artefacts that represent the database schema:
-
-| Artefact | Purpose | Writable? |
-|---|---|---|
-| `supabase/migrations/*.sql` | Applied to Postgres; controls the real schema | ✓ Edit this |
-| `src/lib/db/schema.ts` | Drizzle ORM schema; TypeScript types only | Sync manually |
+| Artefact | Purpose |
+|---|---|
+| `src/lib/db/schema.ts` | Drizzle ORM schema used by the app and TypeScript |
+| `supabase/migrations/*.sql` | Reviewable SQL history for client database setup |
 
 ### Making a schema change
 
-1. Create a new migration file in `supabase/migrations/` following the naming pattern `NNN_description.sql`.
-2. Apply it: `npx supabase db push` (remote) or `npx supabase db reset` (local).
-3. Update `src/lib/db/schema.ts` to reflect the change so TypeScript types stay accurate.
-4. **Do not** run `drizzle-kit push` or `drizzle-kit generate` against production — Drizzle is used for types only, not as a migration runner.
+1. Update `src/lib/db/schema.ts`.
+2. Add or update the matching SQL migration in `supabase/migrations/`.
+3. Run `npm run lint`, `npm run test`, and `npm run build`.
+4. For a provisioned environment, apply the schema with the agreed deployment flow. `npm run db:push` is available for controlled Drizzle-backed environments.
 
-### Why two systems?
-
-Supabase migrations give us a versioned, reviewable SQL history with rollback capability and RLS policy support. Drizzle provides typed query builders without owning migration control. Keeping Drizzle in "types only" mode prevents accidental schema drift from two competing migration sources.
+Keep the schema focused on the current product: auth/workspaces, Stripe billing state, CRM leads, markdown notes, messages, channel connection state, tasks, activities, and AI action history.
